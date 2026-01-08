@@ -243,4 +243,5 @@ poppler-*/
 
 # Model caches
 .cache/
-models/
+/models/
+!src/dnd_manager/models/

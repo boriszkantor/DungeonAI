@@ -786,6 +786,11 @@ def render_character_details(character: ActorEntity) -> None:
             st.caption(f"... and {len(character.class_features.features) - 10} more")
         st.divider()
     
+    # Background
+    if character.background:
+        st.markdown(f"**Background:** {character.background}")
+        st.divider()
+    
     # Personality (from Journal)
     if character.journal:
         has_personality = (
@@ -804,6 +809,56 @@ def render_character_details(character: ActorEntity) -> None:
                 st.markdown(f"*Bonds:* {', '.join(character.journal.bonds)}")
             if character.journal.flaws:
                 st.markdown(f"*Flaws:* {', '.join(character.journal.flaws)}")
+            st.divider()
+        
+        # Appearance
+        appearance_summary = character.journal.get_appearance_summary() if hasattr(character.journal, 'get_appearance_summary') else ""
+        if not appearance_summary:
+            # Fallback: build from individual fields
+            appearance_parts = []
+            if character.journal.age:
+                appearance_parts.append(f"Age: {character.journal.age}")
+            if character.journal.height:
+                appearance_parts.append(f"Height: {character.journal.height}")
+            if character.journal.weight:
+                appearance_parts.append(f"Weight: {character.journal.weight}")
+            if character.journal.eyes:
+                appearance_parts.append(f"Eyes: {character.journal.eyes}")
+            if character.journal.hair:
+                appearance_parts.append(f"Hair: {character.journal.hair}")
+            if character.journal.skin:
+                appearance_parts.append(f"Skin: {character.journal.skin}")
+            if character.journal.appearance:
+                appearance_parts.append(character.journal.appearance)
+            appearance_summary = "; ".join(appearance_parts)
+        
+        if appearance_summary:
+            st.markdown("**Appearance**")
+            st.markdown(appearance_summary)
+            st.divider()
+        
+        # Backstory
+        if character.journal.backstory:
+            st.markdown("**Backstory**")
+            st.markdown(character.journal.backstory)
+            st.divider()
+        
+        # Allies & Organizations
+        if character.journal.allies_and_organizations:
+            st.markdown("**Allies & Organizations**")
+            st.markdown(character.journal.allies_and_organizations)
+            st.divider()
+        
+        # Additional Treasure
+        if character.journal.treasure:
+            st.markdown("**Additional Treasure**")
+            st.markdown(character.journal.treasure)
+            st.divider()
+        
+        # Additional Features & Traits
+        if character.journal.additional_features_traits:
+            st.markdown("**Additional Features & Traits**")
+            st.markdown(character.journal.additional_features_traits)
 
 
 def roll_4d6_drop_lowest() -> int:
@@ -1255,41 +1310,23 @@ def render_character_creator() -> None:
                 # At-will feature, just store the name
                 simple_features.append(feature_name)
         
-        # Build journal with personality/backstory
+        # Build journal with personality/backstory using proper fields
         from dnd_manager.models.ecs import JournalComponent
-        
-        from dnd_manager.models.ecs import MemoryEntry
         
         journal = JournalComponent(
             personality_traits=[t.strip() for t in personality_traits.split('\n') if t.strip()] if personality_traits else [],
             ideals=[ideals.strip()] if ideals and ideals.strip() else [],
             bonds=[bonds.strip()] if bonds and bonds.strip() else [],
             flaws=[flaws.strip()] if flaws and flaws.strip() else [],
+            backstory=backstory.strip() if backstory else "",
+            appearance=appearance.strip() if appearance else "",
+            age=age.strip() if age else "",
+            height=height.strip() if height else "",
+            weight=weight.strip() if weight else "",
+            eyes=eyes.strip() if eyes else "",
+            hair=hair.strip() if hair else "",
+            skin=skin.strip() if skin else "",
         )
-        
-        # Add backstory as a memory if provided
-        if backstory and backstory.strip():
-            journal.memories.append(MemoryEntry(
-                content=f"Backstory: {backstory.strip()}",
-                importance=10,
-            ))
-        
-        # Build appearance description
-        appearance_parts = []
-        if age: appearance_parts.append(f"Age: {age}")
-        if gender: appearance_parts.append(f"Gender: {gender}")
-        if height: appearance_parts.append(f"Height: {height}")
-        if weight: appearance_parts.append(f"Weight: {weight}")
-        if eyes: appearance_parts.append(f"Eyes: {eyes}")
-        if hair: appearance_parts.append(f"Hair: {hair}")
-        if skin: appearance_parts.append(f"Skin: {skin}")
-        if appearance: appearance_parts.append(f"Description: {appearance}")
-        
-        if appearance_parts:
-            journal.memories.append(MemoryEntry(
-                content=f"Appearance: {'; '.join(appearance_parts)}",
-                importance=8,
-            ))
         
         # Create the character
         # Build starting inventory first so we can calculate AC
@@ -1334,6 +1371,7 @@ def render_character_creator() -> None:
             race=race,  # Keep full race name (with subrace)
             size=racial_traits.get("size", "Medium"),
             alignment=alignment,
+            background=background,  # D&D background (Soldier, Noble, etc.)
             stats=StatsComponent(
                 strength=strength,
                 dexterity=dexterity,

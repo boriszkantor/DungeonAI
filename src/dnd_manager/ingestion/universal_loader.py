@@ -340,11 +340,12 @@ CHARACTER_EXTRACTION_PROMPT = """You are an expert D&D 5E character sheet parser
 
 CRITICAL RULES:
 1. Extract ONLY what you can see. Do not invent or assume any values.
-2. If a field is not visible or unclear, use null.
+2. If a field is not visible or unclear, use null or empty string.
 3. Ability scores MUST be integers between 1 and 30.
 4. HP values must be positive integers.
 5. Level must be between 1 and 20.
 6. Include ALL visible spells, items, and features.
+7. IMPORTANT: Extract ALL page 2 content including backstory, allies, appearance, etc.
 
 OUTPUT FORMAT (JSON only, no markdown):
 {
@@ -379,11 +380,29 @@ OUTPUT FORMAT (JSON only, no markdown):
   "spell_slots": {"1": 4, "2": 3},
   "features": ["Second Wind", "Action Surge"],
   "personality_traits": ["I am fearless"],
-  "ideals": ["Honor"],
+  "ideals": ["Honor above all else"],
   "bonds": ["My sword belonged to my father"],
-  "flaws": ["I am reckless"],
+  "flaws": ["I am reckless in battle"],
   "background": "Soldier",
-  "alignment": "Lawful Good"
+  "alignment": "Lawful Good",
+  "backstory": "Full character backstory text from the sheet...",
+  "allies_and_organizations": "Any allies, organizations, or factions listed...",
+  "appearance": "Physical description text...",
+  "age": "25",
+  "height": "6'2\"",
+  "weight": "180 lbs",
+  "eyes": "Blue",
+  "hair": "Brown",
+  "skin": "Fair",
+  "treasure": "Any additional treasure or valuables listed...",
+  "additional_features_traits": "Any additional features/traits from page 2...",
+  "currency": {
+    "copper": 0,
+    "silver": 0,
+    "electrum": 0,
+    "gold": 15,
+    "platinum": 0
+  }
 }"""
 
 
@@ -605,12 +624,23 @@ class CharacterExtractor:
                     spell_slots=spell_slots,
                 )
 
-            # Journal/Personality
+            # Journal/Personality - include all page 2 content
             journal = JournalComponent(
                 personality_traits=data.get("personality_traits", []),
                 ideals=data.get("ideals", []),
                 bonds=data.get("bonds", []),
                 flaws=data.get("flaws", []),
+                backstory=data.get("backstory", "") or "",
+                allies_and_organizations=data.get("allies_and_organizations", "") or "",
+                appearance=data.get("appearance", "") or "",
+                age=data.get("age", "") or "",
+                height=data.get("height", "") or "",
+                weight=data.get("weight", "") or "",
+                eyes=data.get("eyes", "") or "",
+                hair=data.get("hair", "") or "",
+                skin=data.get("skin", "") or "",
+                treasure=data.get("treasure", "") or "",
+                additional_features_traits=data.get("additional_features_traits", "") or "",
             )
 
             # Movement
@@ -626,6 +656,7 @@ class CharacterExtractor:
                 type=ActorType.PLAYER,
                 race=data.get("race", "Unknown"),
                 alignment=data.get("alignment", "Neutral"),
+                background=data.get("background", "") or "",
                 stats=stats,
                 health=health,
                 defense=defense,

@@ -52,13 +52,14 @@ logger = get_logger(__name__)
 CHARACTER_EXTRACTION_SYSTEM_PROMPT = """You are a D&D 5E character sheet data extractor. Your task is to analyze the provided character sheet image and extract all character information into a structured JSON format.
 
 IMPORTANT: You must output ONLY valid JSON with no additional text, markdown formatting, or explanation.
+IMPORTANT: Extract ALL page 2 content including backstory, allies, appearance details, etc.
 
 Extract the following information into this exact JSON structure:
 
 {
   "name": "Character name (string)",
   "race": "Character race (string)",
-  "background": "Character background (string, optional)",
+  "background": "Character background (string, e.g., 'Soldier', 'Noble')",
   "alignment": "Alignment as lowercase with underscores (e.g., 'lawful_good', 'chaotic_neutral', 'true_neutral')",
   "experience_points": 0,
   "classes": [
@@ -105,7 +106,24 @@ Extract the following information into this exact JSON structure:
   "ideals": ["Ideal strings"],
   "bonds": ["Bond strings"],
   "flaws": ["Flaw strings"],
-  "biography": "Character backstory (string, can be empty)"
+  "backstory": "Full character backstory text from page 2",
+  "allies_and_organizations": "Allies, organizations, and faction affiliations from page 2",
+  "appearance": "Physical appearance description from page 2",
+  "age": "Character age",
+  "height": "Character height",
+  "weight": "Character weight",
+  "eyes": "Eye color",
+  "hair": "Hair color/style",
+  "skin": "Skin tone",
+  "treasure": "Additional treasure from page 2",
+  "additional_features_traits": "Additional features and traits from page 2",
+  "currency": {
+    "copper": 0,
+    "silver": 0,
+    "electrum": 0,
+    "gold": 0,
+    "platinum": 0
+  }
 }
 
 RULES:
@@ -113,9 +131,10 @@ RULES:
 2. Ability scores must be integers between 1-30
 3. Level must be between 1-20
 4. Hit die must be 6, 8, 10, or 12
-5. If a value is not visible or unclear, use reasonable defaults
+5. If a value is not visible or unclear, use empty string or null
 6. For alignment, use exactly one of: lawful_good, neutral_good, chaotic_good, lawful_neutral, true_neutral, chaotic_neutral, lawful_evil, neutral_evil, chaotic_evil
 7. For skills, use: athletics, acrobatics, sleight_of_hand, stealth, arcana, history, investigation, nature, religion, animal_handling, insight, medicine, perception, survival, deception, intimidation, performance, persuasion
+8. Extract ALL text from page 2 fields like backstory, allies, and appearance - do not truncate
 
 Output ONLY the JSON object, no other text."""
 
