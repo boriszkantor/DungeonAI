@@ -218,6 +218,37 @@ class Vitals(BaseModel):
         description="Bonus added to initiative rolls (typically DEX modifier + any features)."
     )
 
+    # Compatibility properties for UI code that uses hp_max/hp_current naming
+    @property
+    def hp_max(self) -> int:
+        """Alias for max_hp for compatibility."""
+        return self.max_hp
+    
+    @hp_max.setter
+    def hp_max(self, value: int) -> None:
+        """Setter for hp_max alias."""
+        self.max_hp = value
+    
+    @property
+    def hp_current(self) -> int:
+        """Alias for current_hp for compatibility."""
+        return self.current_hp
+    
+    @hp_current.setter
+    def hp_current(self, value: int) -> None:
+        """Setter for hp_current alias."""
+        self.current_hp = value
+    
+    @property
+    def hp_temp(self) -> int:
+        """Alias for temp_hp for compatibility."""
+        return self.temp_hp
+    
+    @hp_temp.setter
+    def hp_temp(self, value: int) -> None:
+        """Setter for hp_temp alias."""
+        self.temp_hp = value
+
     @computed_field
     @property
     def is_bloodied(self) -> bool:
@@ -737,6 +768,32 @@ class Character(BaseModel):
         default_factory=list,
         description="Conditions the character cannot be affected by."
     )
+
+    # Compatibility properties for UI code
+    @property
+    def health(self) -> Vitals:
+        """Alias for vitals for compatibility with UI code."""
+        return self.vitals
+    
+    @property
+    def ac(self) -> int:
+        """Shortcut to armor class for compatibility."""
+        return self.vitals.armor_class
+    
+    @ac.setter
+    def ac(self, value: int) -> None:
+        """Setter for ac shortcut."""
+        self.vitals.armor_class = value
+    
+    @property
+    def name(self) -> str:
+        """Shortcut to character name for compatibility."""
+        return self.roleplay.name
+    
+    @name.setter
+    def name(self, value: str) -> None:
+        """Setter for name shortcut."""
+        self.roleplay.name = value
 
     @computed_field
     @property
