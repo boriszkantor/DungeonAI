@@ -1,0 +1,241 @@
+[build-system]
+requires = ["hatchling>=1.21.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dnd-manager"
+version = "0.1.0"
+description = "D&D 5E AI Campaign Manager - A modular monolith for AI-powered tabletop RPG management"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [
+    { name = "D&D Campaign Manager Team", email = "team@dndmanager.dev" },
+]
+keywords = [
+    "dnd",
+    "dungeons-and-dragons",
+    "5e",
+    "campaign-manager",
+    "ai",
+    "tabletop",
+    "rpg",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Games/Entertainment :: Role-Playing",
+    "Typing :: Typed",
+]
+dependencies = [
+    # Core
+    "pydantic>=2.0,<3.0",
+    "pydantic-settings>=2.0,<3.0",
+    "python-dotenv>=1.0.0",
+    "structlog>=24.1.0",
+    "tenacity>=8.2.0",
+    "httpx>=0.27.0",
+    # AI/LLM (OpenRouter via openai client)
+    "openai>=1.0.0",
+    # PDF Processing
+    "pdf2image>=1.17.0",           # Vision pipeline (PDF -> images)
+    "Pillow>=10.0.0",              # Image handling
+    "pymupdf4llm>=0.0.10",         # Markdown extraction for RAG
+    # Vector Store & RAG
+    "chromadb>=0.4.0",             # Primary vector DB (local persistence)
+    "langchain-text-splitters>=0.0.1",  # Text chunking utilities
+    # Game Logic
+    "d20>=1.1.0",                  # Dice rolling & expression parsing
+    "numpy>=1.26.0,<2.0",
+    # Frontend
+    "streamlit>=1.30.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-mock>=3.12.0",
+    "mypy>=1.8.0",
+    "ruff>=0.2.0",
+    "pre-commit>=3.6.0",
+    "types-pyyaml>=6.0.12",
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.24.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-org/dnd-manager"
+Documentation = "https://dnd-manager.readthedocs.io"
+Repository = "https://github.com/your-org/dnd-manager"
+Issues = "https://github.com/your-org/dnd-manager/issues"
+
+[project.scripts]
+dnd-manager = "dnd_manager.ui.app:main"
+
+# =============================================================================
+# Hatch Build Configuration
+# =============================================================================
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dnd_manager"]
+
+# =============================================================================
+# Ruff Configuration (Linting & Formatting)
+# =============================================================================
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking
+    "PTH",    # flake8-use-pathlib
+    "ERA",    # eradicate (commented-out code)
+    "PL",     # Pylint
+    "RUF",    # Ruff-specific rules
+    "PERF",   # Perflint
+    "D",      # pydocstyle
+]
+ignore = [
+    "D100",   # Missing docstring in public module
+    "D104",   # Missing docstring in public package
+    "D107",   # Missing docstring in __init__
+    "D203",   # 1 blank line required before class docstring (conflicts with D211)
+    "D213",   # Multi-line docstring summary should start at the second line (conflicts with D212)
+    "PLR0913", # Too many arguments to function call
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "D",      # Docstrings not required in tests
+    "ARG",    # Unused arguments allowed in tests (fixtures)
+    "PLR2004", # Magic value comparison allowed in tests
+]
+"__init__.py" = ["F401"]  # Unused imports allowed in __init__.py
+
+[tool.ruff.lint.isort]
+known-first-party = ["dnd_manager"]
+force-single-line = false
+lines-after-imports = 2
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# =============================================================================
+# MyPy Configuration (Static Type Checking)
+# =============================================================================
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+show_error_codes = true
+show_column_numbers = true
+pretty = true
+ignore_missing_imports = true
+
+# Per-module overrides
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[[tool.mypy.overrides]]
+module = [
+    "streamlit.*",
+    "d20.*",
+    "faiss.*",
+    "chromadb.*",
+    "pymupdf4llm.*",
+    "pdf2image.*",
+    "PIL.*",
+    "langchain_text_splitters.*",
+]
+ignore_missing_imports = true
+
+# =============================================================================
+# Pytest Configuration
+# =============================================================================
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = [
+    "-ra",
+    "-q",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=src/dnd_manager",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+    "--cov-fail-under=80",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning",
+]
+asyncio_mode = "auto"
+
+# =============================================================================
+# Coverage Configuration
+# =============================================================================
+[tool.coverage.run]
+source = ["src/dnd_manager"]
+branch = true
+parallel = true
+omit = [
+    "*/tests/*",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "@overload",
+    "class .*\\bProtocol\\):",
+    "@abstractmethod",
+]
+show_missing = true
+precision = 2
