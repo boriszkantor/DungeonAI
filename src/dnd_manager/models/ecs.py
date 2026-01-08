@@ -364,9 +364,17 @@ class HealthComponent(Component):
     death saving throw progress and active conditions.
     """
 
-    hp_current: int = Field(default=10, ge=0, description="Current hit points")
-    hp_max: int = Field(default=10, ge=1, description="Maximum hit points")
-    hp_temp: int = Field(default=0, ge=0, description="Temporary hit points")
+    hp_current: int = Field(default=10, ge=0, description="Current hit points", alias="current_hp")
+    hp_max: int = Field(default=10, ge=1, description="Maximum hit points", alias="max_hp")
+    hp_temp: int = Field(default=0, ge=0, description="Temporary hit points", alias="temp_hp")
+    
+    model_config = ConfigDict(
+        frozen=False,
+        validate_assignment=True,
+        extra="ignore",
+        use_enum_values=True,
+        populate_by_name=True,  # Allow both field name and alias
+    )
 
     death_saves_success: int = Field(default=0, ge=0, le=3)
     death_saves_failure: int = Field(default=0, ge=0, le=3)
