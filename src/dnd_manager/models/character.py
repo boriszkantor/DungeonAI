@@ -2,9 +2,15 @@
 
 This module defines the data models for player characters and NPCs,
 including ability scores, classes, and derived statistics.
+
+DEPRECATED: This module is deprecated in favor of the unified ECS architecture
+in models/ecs.py. It is maintained for backward compatibility only.
+New code should use ActorEntity from models/ecs.py.
 """
 
 from __future__ import annotations
+
+import warnings
 
 from enum import StrEnum
 from typing import Annotated
@@ -170,6 +176,24 @@ class Character(BaseModel):
             True if current HP is above 0.
         """
         return self.current_hit_points > 0
+
+
+# =============================================================================
+# Deprecation Warning
+# =============================================================================
+
+def _issue_deprecation_warning() -> None:
+    """Issue deprecation warning when this module is imported."""
+    warnings.warn(
+        "models.character is deprecated. Use models.ecs.ActorEntity instead. "
+        "This compatibility layer will be removed in a future version.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
+# Issue warning on import
+_issue_deprecation_warning()
 
 
 __all__ = [

@@ -12,9 +12,15 @@ Components:
     ArmorComponent: Armor class calculation.
     SavingThrowsComponent: Saving throw proficiencies and bonuses.
     SkillsComponent: Skill proficiencies and expertise.
+
+DEPRECATED: These components have been fully integrated into models/ecs.py.
+This module is maintained for backward compatibility only.
+New code should import from models/ecs.py.
 """
 
 from __future__ import annotations
+
+import warnings
 
 from typing import Annotated, Any
 
@@ -728,6 +734,24 @@ class SkillsComponent(BaseModel):
             bonus += proficiency_bonus
 
         return bonus
+
+
+# =============================================================================
+# Deprecation Warning
+# =============================================================================
+
+def _issue_deprecation_warning() -> None:
+    """Issue deprecation warning when this module is imported."""
+    warnings.warn(
+        "models.components is deprecated. Use components from models.ecs instead. "
+        "This compatibility layer will be removed in a future version.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
+# Issue warning on import
+_issue_deprecation_warning()
 
 
 __all__ = [

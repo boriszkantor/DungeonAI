@@ -189,9 +189,13 @@ def get_or_create_dm() -> DMOrchestrator:
             # Skip system and roll messages - they're UI-only
         
         # Get model from settings (if available)
-        dm_model = "google/gemini-2.5-pro-preview"  # Default
-        if "settings" in st.session_state:
-            dm_model = st.session_state.settings.get("dm_model", dm_model)
+        # Default to a model with good tool-calling support
+        dm_model = "google/gemini-2.5-flash-preview"
+        if "settings" in st.session_state and st.session_state.settings.get("dm_model"):
+            dm_model = st.session_state.settings["dm_model"]
+        
+        # Log the model being used for debugging
+        logger.info(f"DM Model selected: {dm_model}")
         
         st.session_state.dm = DMOrchestrator(
             game_state=st.session_state.game_state,
@@ -386,15 +390,54 @@ def render_main_area() -> None:
 
 
 def render_chat_history() -> None:
-    """Render the chat history with themed messages and edit controls."""
+    """Render the chat history with themed messages and edit controls.
+    
+    Includes pagination for long chat histories to improve performance
+    and readability.
+    """
+    from dnd_manager.core.constants import MESSAGES_PER_PAGE
     
     # Initialize editing state
     if "editing_message_idx" not in st.session_state:
         st.session_state.editing_message_idx = None
     if "regenerate_from_idx" not in st.session_state:
         st.session_state.regenerate_from_idx = None
+    if "chat_page_offset" not in st.session_state:
+        st.session_state.chat_page_offset = 0
     
-    for idx, msg in enumerate(st.session_state.chat_history):
+    # Get chat history
+    history = st.session_state.chat_history
+    total_messages = len(history)
+    
+    # Pagination logic
+    if total_messages > MESSAGES_PER_PAGE + st.session_state.chat_page_offset:
+        # Calculate how many earlier messages are hidden
+        start_idx = total_messages - MESSAGES_PER_PAGE - st.session_state.chat_page_offset
+        hidden_count = start_idx
+        
+        # Show "Load earlier messages" button
+        if hidden_count > 0:
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                if st.button(
+                    f"⬆️ Load earlier messages ({hidden_count} more)",
+                    use_container_width=True,
+                    key="load_earlier_messages",
+                ):
+                    # Load one page worth of earlier messages
+                    st.session_state.chat_page_offset += min(MESSAGES_PER_PAGE, hidden_count)
+                    st.rerun()
+            st.markdown("---")
+        
+        # Slice the history to show only the current page
+        display_history = history[start_idx:]
+    else:
+        display_history = history
+        start_idx = 0
+    
+    # Render messages (with adjusted indices)
+    for display_idx, msg in enumerate(display_history):
+        idx = start_idx + display_idx  # Actual index in full history
         role = msg["role"]
         content = msg["content"]
         
@@ -677,9 +720,31 @@ def render_level_up_screen() -> None:
             st.info(f"You can now know up to **{level_info['spells_known']} spells**")
     
     # Subclass selection
+    selected_subclass = None
     if level_info["is_subclass_level"] and not primary_class.subclass:
+        from dnd_manager.models.progression import get_subclass_options
+        
         st.markdown("### 🏛️ Subclass Selection")
-        st.warning("You must choose a subclass! Discuss with your DM and they will help you select one.")
+        st.markdown("*Choose your specialization path!*")
+        
+        subclass_options = get_subclass_options(primary_class.class_name)
+        
+        if subclass_options:
+            # Create radio options with descriptions
+            option_labels = [f"**{name}** - {desc}" for name, desc in subclass_options]
+            
+            selected_idx = st.radio(
+                "Choose your subclass:",
+                range(len(subclass_options)),
+                format_func=lambda i: f"{subclass_options[i][0]}",
+                key="subclass_select",
+            )
+            
+            if selected_idx is not None:
+                selected_subclass = subclass_options[selected_idx][0]
+                st.info(f"📜 **{subclass_options[selected_idx][0]}**: {subclass_options[selected_idx][1]}")
+        else:
+            st.warning("Subclass options not found. Discuss with your DM.")
     
     # Confirm button
     st.divider()
@@ -697,6 +762,9 @@ def render_level_up_screen() -> None:
         can_confirm = True
         if hp_method == "Roll" and "hp_roll" not in st.session_state:
             can_confirm = False
+        # Must select subclass if it's a subclass level
+        if level_info["is_subclass_level"] and not primary_class.subclass and not selected_subclass:
+            can_confirm = False
         
         if st.button(
             "✅ Confirm Level Up",
@@ -711,6 +779,7 @@ def render_level_up_screen() -> None:
             results = character.level_up(
                 hp_roll=hp_roll,
                 asi_choices=asi_choices if asi_choices else None,
+                subclass=selected_subclass,
             )
             
             # Clear state
@@ -723,11 +792,17 @@ def render_level_up_screen() -> None:
             
             # Add announcement to chat
             features_str = ", ".join(results.get("features_gained", [])) or "None"
+            subclass_str = f"\n• Subclass: {results['subclass']}" if results.get("subclass") else ""
+            asi_str = ""
+            if results.get("asi_applied"):
+                asi_parts = [f"{k.title()} +{v}" for k, v in results["asi_applied"].items()]
+                asi_str = f"\n• ASI: {', '.join(asi_parts)}"
+            
             add_chat_message(
                 "system",
                 f"🎉 **{character.name}** has reached **Level {results['new_level']}**!\n"
                 f"• HP: +{results['hp_gained']} (now {results['new_hp_max']})\n"
-                f"• New Features: {features_str}"
+                f"• New Features: {features_str}{subclass_str}{asi_str}"
             )
             
             st.rerun()
@@ -1005,22 +1080,70 @@ def render_sidebar_character_sheet(character: ActorEntity) -> None:
             cond_name = condition.value if hasattr(condition, 'value') else str(condition)
             st.warning(f"🔴 {cond_name.title()}")
     
-    # Equipment summary (quick view of equipped items)
+    # Interactive Equipment Manager
     if character.inventory and character.inventory.items:
         equipped = [item for item in character.inventory.items if item.equipped]
-        if equipped:
-            with st.expander("🗡️ Equipment", expanded=False):
-                for item in equipped:
+        unequipped = [item for item in character.inventory.items if not item.equipped]
+        
+        with st.expander("🗡️ Equipment", expanded=False):
+            # Show equipped items with unequip buttons
+            if equipped:
+                st.markdown("**Currently Equipped:**")
+                for i, item in enumerate(equipped):
+                    col1, col2 = st.columns([3, 1])
+                    
                     details = []
                     if item.damage_dice:
-                        details.append(f"{item.damage_dice} {item.damage_type or ''}")
+                        details.append(f"{item.damage_dice}")
                     if item.ac_base:
                         details.append(f"AC {item.ac_base}")
                     if item.ac_bonus:
                         details.append(f"+{item.ac_bonus} AC")
+                    detail_str = f" *({', '.join(details)})*" if details else ""
                     
-                    detail_str = f" ({', '.join(details)})" if details else ""
-                    st.markdown(f"• **{item.name}**{detail_str}")
+                    col1.markdown(f"⚔️ **{item.name}**{detail_str}")
+                    if col2.button("✖", key=f"unequip_{character.uid}_{i}", help="Unequip"):
+                        item.equipped = False
+                        save_current_session()
+                        st.rerun()
+            else:
+                st.caption("Nothing equipped")
+            
+            # Show unequipped items with equip buttons
+            if unequipped:
+                st.divider()
+                st.markdown("**Inventory:**")
+                for i, item in enumerate(unequipped):
+                    col1, col2 = st.columns([3, 1])
+                    
+                    qty_str = f" (x{item.quantity})" if item.quantity > 1 else ""
+                    details = []
+                    if item.damage_dice:
+                        details.append(f"{item.damage_dice}")
+                    if item.ac_base:
+                        details.append(f"AC {item.ac_base}")
+                    if item.ac_bonus:
+                        details.append(f"+{item.ac_bonus} AC")
+                    detail_str = f" *({', '.join(details)})*" if details else ""
+                    
+                    col1.markdown(f"• {item.name}{qty_str}{detail_str}")
+                    if col2.button("⬆", key=f"equip_{character.uid}_{i}", help="Equip"):
+                        item.equipped = True
+                        save_current_session()
+                        st.rerun()
+            
+            # Currency display
+            if character.inventory.currency_cp > 0:
+                st.divider()
+                cp = character.inventory.currency_cp
+                gp = cp // 100
+                sp = (cp % 100) // 10
+                copper = cp % 10
+                currency_parts = []
+                if gp: currency_parts.append(f"{gp} gp")
+                if sp: currency_parts.append(f"{sp} sp")
+                if copper: currency_parts.append(f"{copper} cp")
+                st.markdown(f"💰 **Currency:** {', '.join(currency_parts) if currency_parts else '0'}")
     
     # Spellcasting (if character has spells)
     if character.spellbook:
@@ -1376,32 +1499,33 @@ def render_sidebar_combat_controls() -> None:
             morale_bar = ""
             if not hp.is_dead and not enemy.has_surrendered and not enemy.is_fleeing:
                 morale_color = "#4A7C3F" if enemy.morale > 50 else "#C9A227" if enemy.morale > 25 else "#8B2020"
-                morale_bar = f"""
-                <div style="display: flex; align-items: center; gap: 4px; margin-top: 2px;">
-                    <span style="font-size: 0.65em; color: var(--text-secondary);">Morale:</span>
-                    <div style="flex: 1; height: 4px; background: var(--bg-elevated); border-radius: 2px; overflow: hidden;">
-                        <div style="height: 100%; width: {enemy.morale}%; background: {morale_color};"></div>
-                    </div>
-                    <span style="font-size: 0.65em; color: var(--text-secondary);">{enemy.morale}%</span>
-                </div>
-                """
+                morale_bar = (
+                    f'<div style="display: flex; align-items: center; gap: 4px; margin-top: 2px;">'
+                    f'<span style="font-size: 0.65em; color: var(--text-secondary);">Morale:</span>'
+                    f'<div style="flex: 1; height: 4px; background: var(--bg-elevated); border-radius: 2px; overflow: hidden;">'
+                    f'<div style="height: 100%; width: {enemy.morale}%; background: {morale_color};"></div>'
+                    f'</div>'
+                    f'<span style="font-size: 0.65em; color: var(--text-secondary);">{enemy.morale}%</span>'
+                    f'</div>'
+                )
             
-            st.markdown(f"""
-            <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; margin: 4px 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                    <span style="font-size: 0.85em;">{status} {enemy.name}{morale_text}</span>
-                    <span style="font-size: 0.8em; color: var(--text-secondary);">AC {enemy.ac}</span>
-                </div>
-                <div style="height: 8px; background: var(--bg-elevated); border-radius: 4px; overflow: hidden;">
-                    <div style="height: 100%; width: {hp_pct}%; border-radius: 4px; background: {bar_color};"></div>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 0.7em; color: var(--text-secondary);">HP</span>
-                    <span style="font-size: 0.75em; color: var(--text-secondary);">{hp.hp_current}/{hp.hp_max}</span>
-                </div>
-                {morale_bar}
-            </div>
-            """, unsafe_allow_html=True)
+            enemy_card = (
+                f'<div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; margin: 4px 0;">'
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">'
+                f'<span style="font-size: 0.85em;">{status} {enemy.name}{morale_text}</span>'
+                f'<span style="font-size: 0.8em; color: var(--text-secondary);">AC {enemy.ac}</span>'
+                f'</div>'
+                f'<div style="height: 8px; background: var(--bg-elevated); border-radius: 4px; overflow: hidden;">'
+                f'<div style="height: 100%; width: {hp_pct}%; border-radius: 4px; background: {bar_color};"></div>'
+                f'</div>'
+                f'<div style="display: flex; justify-content: space-between; align-items: center;">'
+                f'<span style="font-size: 0.7em; color: var(--text-secondary);">HP</span>'
+                f'<span style="font-size: 0.75em; color: var(--text-secondary);">{hp.hp_current}/{hp.hp_max}</span>'
+                f'</div>'
+                f'{morale_bar}'
+                f'</div>'
+            )
+            st.markdown(enemy_card, unsafe_allow_html=True)
         
         st.divider()
     elif game_state.combat_active:

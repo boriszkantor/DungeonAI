@@ -236,18 +236,24 @@ class DiceRoller:
         is_critical: bool = False,
         critical_rule: str = "double_dice",
     ) -> DiceExpression:
-        """Roll damage.
+        """Roll damage with configurable critical hit rules.
 
         Args:
             damage_expression: Damage dice expression (e.g., '2d6+3').
             is_critical: Whether this is a critical hit.
-            critical_rule: How to handle critical hits.
+            critical_rule: How to handle critical hits:
+                - 'double_dice': Double the number of dice (RAW D&D 5E)
+                - 'double_damage': Roll normal, then double the total
+                - 'max_plus_roll': Max damage + normal roll
 
         Returns:
             DiceExpression containing damage roll results.
         """
-        if is_critical and critical_rule == "double_dice":
-            # Double the number of dice
+        if not is_critical:
+            return self.roll(damage_expression)
+        
+        if critical_rule == "double_dice":
+            # Double the number of dice (RAW D&D 5E)
             import re
 
             def double_dice(match: re.Match[str]) -> str:
@@ -255,8 +261,85 @@ class DiceRoller:
                 return f"{count}d{match.group(2)}"
 
             damage_expression = re.sub(r"(\d*)d(\d+)", double_dice, damage_expression)
+            return self.roll(damage_expression)
+        
+        elif critical_rule == "double_damage":
+            # Roll normal damage, then double the total result
+            result = self.roll(damage_expression)
+            return DiceExpression(
+                expression=f"({damage_expression}) × 2",
+                total=result.total * 2,
+                dice=result.dice,
+                modifier=result.modifier * 2,
+                is_critical=True,
+                is_fumble=False,
+                roll_type=RollType.CRITICAL,
+            )
+        
+        elif critical_rule == "max_plus_roll":
+            # Max damage + normal roll
+            max_damage = self._calculate_max_damage(damage_expression)
+            roll_result = self.roll(damage_expression)
+            return DiceExpression(
+                expression=f"MAX({damage_expression}) + {damage_expression}",
+                total=max_damage + roll_result.total,
+                dice=roll_result.dice,
+                modifier=roll_result.modifier,
+                is_critical=True,
+                is_fumble=False,
+                roll_type=RollType.CRITICAL,
+            )
+        
+        else:
+            # Unknown critical rule, default to double dice
+            logger.warning(
+                "Unknown critical rule, defaulting to double_dice",
+                critical_rule=critical_rule,
+            )
+            import re
 
-        return self.roll(damage_expression)
+            def double_dice(match: re.Match[str]) -> str:
+                count = int(match.group(1) or 1) * 2
+                return f"{count}d{match.group(2)}"
+
+            damage_expression = re.sub(r"(\d*)d(\d+)", double_dice, damage_expression)
+            return self.roll(damage_expression)
+    
+    def _calculate_max_damage(self, damage_expression: str) -> int:
+        """Calculate maximum possible damage from a dice expression.
+        
+        Args:
+            damage_expression: Damage dice expression (e.g., '2d6+3').
+        
+        Returns:
+            Maximum possible damage value.
+        """
+        import re
+        
+        max_total = 0
+        
+        # Find all dice (e.g., "2d6")
+        dice_pattern = re.findall(r"(\d*)d(\d+)", damage_expression)
+        for count_str, die_size_str in dice_pattern:
+            count = int(count_str) if count_str else 1
+            die_size = int(die_size_str)
+            max_total += count * die_size
+        
+        # Find all static modifiers (e.g., "+3", "-2")
+        modifier_pattern = re.findall(r"([+-]\s*\d+)", damage_expression)
+        for mod_str in modifier_pattern:
+            # Remove spaces and evaluate
+            mod_str = mod_str.replace(" ", "")
+            max_total += int(mod_str)
+        
+        # If the expression starts with a modifier (no leading sign)
+        # e.g., "5" or "2d6+3" - we need to check if there's a leading number
+        no_dice = re.sub(r"\d*d\d+", "", damage_expression)
+        no_dice = re.sub(r"[+-]\s*\d+", "", no_dice).strip()
+        if no_dice and no_dice.isdigit():
+            max_total += int(no_dice)
+        
+        return max(0, max_total)
 
     def roll_saving_throw(
         self,

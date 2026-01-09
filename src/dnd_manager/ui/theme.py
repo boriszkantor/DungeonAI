@@ -413,6 +413,46 @@ THEME_CSS = """
     }
     
     /* =================================
+       DICE ROLLING ANIMATION
+       ================================= */
+    
+    @keyframes dice-roll {
+        0% { transform: rotate(0deg) scale(1); }
+        25% { transform: rotate(90deg) scale(1.1); }
+        50% { transform: rotate(180deg) scale(1); }
+        75% { transform: rotate(270deg) scale(1.1); }
+        100% { transform: rotate(360deg) scale(1); }
+    }
+    
+    @keyframes dice-bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+    
+    @keyframes dice-glow {
+        0%, 100% { filter: drop-shadow(0 0 0px var(--amber)); }
+        50% { filter: drop-shadow(0 0 8px var(--amber)); }
+    }
+    
+    .dice-rolling {
+        display: inline-block;
+        animation: dice-roll 0.6s ease-out, dice-bounce 0.6s ease-out, dice-glow 0.6s ease-out;
+    }
+    
+    .dice-natural-20 {
+        display: inline-block;
+        animation: dice-roll 0.6s ease-out, dice-glow 1.5s ease-in-out infinite;
+        color: var(--crimson) !important;
+        text-shadow: 0 0 10px var(--crimson);
+    }
+    
+    .dice-natural-1 {
+        display: inline-block;
+        animation: dice-roll 0.6s ease-out;
+        opacity: 0.6;
+    }
+    
+    /* =================================
        SPELL SLOTS
        ================================= */
     
@@ -753,6 +793,43 @@ def render_chat_message(role: str, content: str) -> None:
     }.get(role, "chat-system")
     
     st.markdown(f'<div class="{css_class}">{content}</div>', unsafe_allow_html=True)
+
+
+def render_dice_result(
+    result: int | str,
+    is_natural_20: bool = False,
+    is_natural_1: bool = False,
+    animate: bool = True,
+) -> None:
+    """Render a dice roll result with optional animation.
+    
+    Args:
+        result: The dice roll result (number or formatted string).
+        is_natural_20: Whether this is a natural 20 (critical hit).
+        is_natural_1: Whether this is a natural 1 (fumble).
+        animate: Whether to animate the dice emoji.
+    """
+    dice_emoji = "🎲"
+    
+    if not animate:
+        st.markdown(f"{dice_emoji} **{result}**")
+        return
+    
+    # Determine animation class
+    if is_natural_20:
+        css_class = "dice-natural-20"
+        result_text = f"<span style='color: var(--crimson); font-weight: 700;'>⚔️ **CRITICAL!** {result}</span>"
+    elif is_natural_1:
+        css_class = "dice-natural-1"
+        result_text = f"<span style='opacity: 0.6;'>💥 **FUMBLE!** {result}</span>"
+    else:
+        css_class = "dice-rolling"
+        result_text = f"**{result}**"
+    
+    st.markdown(
+        f'<span class="{css_class}">{dice_emoji}</span> {result_text}',
+        unsafe_allow_html=True,
+    )
 
 
 def render_spell_slots(slots: dict[int, tuple[int, int]]) -> None:

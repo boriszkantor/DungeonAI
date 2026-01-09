@@ -97,7 +97,7 @@ class OpenRouterClient:
         self,
         api_key: str | None = None,
         vision_model: str = "google/gemini-2.0-flash-001",
-        reasoning_model: str = "google/gemini-3-pro-preview",
+        reasoning_model: str = "google/gemini-2.0-flash-001",
     ) -> None:
         """Initialize OpenRouter client.
         
@@ -336,16 +336,23 @@ def images_to_base64(images: list[bytes]) -> list[str]:
 
 
 # System prompt for character extraction
-CHARACTER_EXTRACTION_PROMPT = """You are an expert D&D 5E character sheet parser. Extract ALL data from this character sheet image(s) into the exact JSON structure provided.
+CHARACTER_EXTRACTION_PROMPT = """You are an expert D&D 5E character sheet parser with perfect accuracy. Extract ALL data from this character sheet image(s) into the exact JSON structure provided.
 
-CRITICAL RULES:
-1. Extract ONLY what you can see. Do not invent or assume any values.
-2. If a field is not visible or unclear, use null or empty string.
-3. Ability scores MUST be integers between 1 and 30.
-4. HP values must be positive integers.
-5. Level must be between 1 and 20.
-6. Include ALL visible spells, items, and features.
-7. IMPORTANT: Extract ALL page 2 content including backstory, allies, appearance, etc.
+STANDARD D&D 5E CHARACTER SHEET LAYOUT:
+- Page 1 (front): Name, class, level, race at top. Ability scores (STR/DEX/CON/INT/WIS/CHA) in boxes on left.
+  Saving throws and skills in middle-left. AC, Initiative, Speed in center boxes.
+  HP (current/maximum) prominently displayed. Equipment and features on right side.
+- Page 2 (back): Personality traits, ideals, bonds, flaws at top. Backstory, allies, appearance below.
+
+CRITICAL EXTRACTION RULES:
+1. READ CAREFULLY - Look at the ACTUAL numbers written/printed. Do NOT guess or hallucinate values.
+2. Ability scores are 6 numbers (typically 8-18 range) in boxes labeled STR, DEX, CON, INT, WIS, CHA.
+3. The small number below each ability score is the MODIFIER (ignore it, calculate from score).
+4. HP has two numbers: current (left of /) and maximum (right of /).
+5. If ANY field is unclear or not visible, use null - DO NOT make up values.
+6. Double-check all numbers before outputting - accuracy is critical.
+7. Class levels: Look for "Level X" or just a number next to class name.
+8. Proficiency bonus is usually +2 to +6 based on total level.
 
 OUTPUT FORMAT (JSON only, no markdown):
 {
@@ -437,8 +444,8 @@ class CharacterExtractor:
         """
         logger.info("Starting character extraction via vision pipeline")
 
-        # Step 1: Convert PDF to images
-        images = pdf_to_images(pdf_source, dpi=200, last_page=max_pages)
+        # Step 1: Convert PDF to images at high DPI for accurate text reading
+        images = pdf_to_images(pdf_source, dpi=300, last_page=max_pages)
         images_b64 = images_to_base64(images)
 
         logger.info(f"Sending {len(images_b64)} page(s) to vision model")
@@ -486,26 +493,37 @@ class CharacterExtractor:
 
     def _build_actor_entity(self, data: dict[str, Any]) -> ActorEntity:
         """Build ActorEntity from extracted data."""
+        
+        def safe_int(value: Any, default: int) -> int:
+            """Safely convert value to int, handling None and invalid types."""
+            if value is None:
+                return default
+            try:
+                return int(value)
+            except (ValueError, TypeError):
+                return default
+        
         try:
-            # Stats
-            stats_data = data.get("stats", {})
+            # Stats - handle None values from AI extraction
+            stats_data = data.get("stats") or {}
             stats = StatsComponent(
-                strength=stats_data.get("strength", 10),
-                dexterity=stats_data.get("dexterity", 10),
-                constitution=stats_data.get("constitution", 10),
-                intelligence=stats_data.get("intelligence", 10),
-                wisdom=stats_data.get("wisdom", 10),
-                charisma=stats_data.get("charisma", 10),
-                proficiency_bonus=data.get("proficiency_bonus", 2),
+                strength=safe_int(stats_data.get("strength"), 10),
+                dexterity=safe_int(stats_data.get("dexterity"), 10),
+                constitution=safe_int(stats_data.get("constitution"), 10),
+                intelligence=safe_int(stats_data.get("intelligence"), 10),
+                wisdom=safe_int(stats_data.get("wisdom"), 10),
+                charisma=safe_int(stats_data.get("charisma"), 10),
+                proficiency_bonus=safe_int(data.get("proficiency_bonus"), 2),
                 save_proficiencies=[
-                    p for p in data.get("saving_throw_proficiencies", [])
+                    p for p in (data.get("saving_throw_proficiencies") or []) if p
                 ],
-                skill_proficiencies=data.get("skill_proficiencies", {}),
+                skill_proficiencies=data.get("skill_proficiencies") or {},
             )
 
-            # Health
-            hp_max = data.get("hp_max", 10)
-            hp_current = data.get("hp_current", hp_max)
+            # Health - handle None values from AI extraction
+            hp_max = safe_int(data.get("hp_max"), 10)
+            hp_current = safe_int(data.get("hp_current"), hp_max)
+            
             health = HealthComponent(
                 hp_current=hp_current,
                 hp_max=hp_max,

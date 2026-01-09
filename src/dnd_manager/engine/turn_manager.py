@@ -345,8 +345,13 @@ class TurnManager:
             movement_remaining=30,  # Default speed
         )
 
-        # Roll initiative (assume DEX mod of 0 if not available)
-        dex_mod = 0  # Would normally get from character stats
+        # Roll initiative with actual DEX modifier from combatant stats
+        dex_mod = 0
+        if hasattr(combatant, 'stats') and hasattr(combatant.stats, 'dex_mod'):
+            dex_mod = combatant.stats.dex_mod
+        elif hasattr(combatant, 'stats') and hasattr(combatant.stats, 'dexterity'):
+            dex_mod = (combatant.stats.dexterity - 10) // 2
+        
         return self._initiative_tracker.roll_initiative(
             combatant.id,
             combatant.name,

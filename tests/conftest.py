@@ -98,29 +98,64 @@ def sample_character_data(sample_character_stats: dict[str, int]) -> dict[str, A
 
 @pytest.fixture
 def sample_character(sample_character_data: dict[str, Any]) -> Any:
-    """Create a sample Character instance.
+    """Create a sample ActorEntity instance for testing.
 
     Args:
         sample_character_data: Character data dictionary.
 
     Returns:
-        Character instance.
+        ActorEntity instance.
     """
-    from dnd_manager.models.character import Character, CharacterClass, CharacterStats
+    from dnd_manager.models.ecs import (
+        ActorEntity,
+        ActorType,
+        ClassFeatureComponent,
+        ClassLevel,
+        DefenseComponent,
+        HealthComponent,
+        StatsComponent,
+    )
 
-    stats = CharacterStats(**sample_character_data["stats"])
-    classes = [CharacterClass(**c) for c in sample_character_data["classes"]]
-
-    return Character(
+    # Create stats component
+    stats = StatsComponent(**sample_character_data["stats"])
+    
+    # Create health component
+    health = HealthComponent(
+        hp_max=sample_character_data["max_hit_points"],
+        hp_current=sample_character_data["current_hit_points"],
+    )
+    
+    # Create defense component (armor)
+    defense = DefenseComponent(
+        base_armor=sample_character_data["armor_class"],
+    )
+    
+    # Create class features component
+    class_levels = []
+    for cls_data in sample_character_data["classes"]:
+        class_levels.append(
+            ClassLevel(
+                class_name=cls_data["name"],
+                level=cls_data["level"],
+                subclass_name=cls_data.get("subclass"),
+                hit_die=cls_data.get("hit_die", 10),
+            )
+        )
+    
+    class_features = ClassFeatureComponent(
+        classes=class_levels,
+        features=[],  # Can be populated with specific features if needed
+    )
+    
+    # Create the actor entity
+    return ActorEntity(
         name=sample_character_data["name"],
         race=sample_character_data["race"],
+        type=ActorType.NPC_ALLY if sample_character_data.get("is_npc", False) else ActorType.PLAYER,
         stats=stats,
-        classes=classes,
-        max_hit_points=sample_character_data["max_hit_points"],
-        current_hit_points=sample_character_data["current_hit_points"],
-        armor_class=sample_character_data["armor_class"],
-        speed=sample_character_data["speed"],
-        is_npc=sample_character_data["is_npc"],
+        health=health,
+        defense=defense,
+        class_features=class_features,
     )
 
 

@@ -10,9 +10,15 @@ Entities:
     Monster: AI-controlled creature with challenge rating.
     NPC: Non-player character (ally, neutral, or enemy).
     Combatant: Discriminated union of all combat-capable entities.
+
+DEPRECATED: Most functionality has been consolidated into models/ecs.py
+with the ActorEntity class. This module is maintained for backward compatibility.
+New code should use ActorEntity from models/ecs.py.
 """
 
 from __future__ import annotations
+
+import warnings
 
 from typing import Annotated, Any, Literal
 from uuid import UUID, uuid4
@@ -882,6 +888,24 @@ def create_monster(
         size=size,
         armor_class_override=armor_class,
     )
+
+
+# =============================================================================
+# Deprecation Warning
+# =============================================================================
+
+def _issue_deprecation_warning() -> None:
+    """Issue deprecation warning when this module is imported."""
+    warnings.warn(
+        "models.entities is being consolidated into models.ecs.ActorEntity. "
+        "This compatibility layer will be removed in a future version.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
+# Issue warning on import
+_issue_deprecation_warning()
 
 
 __all__ = [

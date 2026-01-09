@@ -25,9 +25,11 @@ apply_theme()
 
 # Fallback models if API fetch fails
 FALLBACK_MODELS = [
-    {"id": "google/gemini-2.5-pro-preview", "name": "Gemini 2.5 Pro", "context_length": 1000000, "pricing": {"prompt": "1.25", "completion": "5.00"}, "description": "Google's most capable model"},
+    {"id": "google/gemini-2.5-pro-preview", "name": "Gemini 2.5 Pro", "context_length": 1000000, "pricing": {"prompt": "1.25", "completion": "5.00"}, "description": "Google's best reasoning model"},
+    {"id": "google/gemini-2.5-flash-preview", "name": "Gemini 2.5 Flash", "context_length": 1000000, "pricing": {"prompt": "0.15", "completion": "0.60"}, "description": "Fast Gemini with great tool use"},
     {"id": "google/gemini-2.0-flash-001", "name": "Gemini 2.0 Flash", "context_length": 1000000, "pricing": {"prompt": "0.10", "completion": "0.40"}, "description": "Fast and efficient"},
-    {"id": "anthropic/claude-3.5-sonnet", "name": "Claude 3.5 Sonnet", "context_length": 200000, "pricing": {"prompt": "3.00", "completion": "15.00"}, "description": "Excellent for creative writing"},
+    {"id": "anthropic/claude-sonnet-4", "name": "Claude Sonnet 4", "context_length": 200000, "pricing": {"prompt": "3.00", "completion": "15.00"}, "description": "Excellent for creative writing and tool use"},
+    {"id": "anthropic/claude-3.5-sonnet", "name": "Claude 3.5 Sonnet", "context_length": 200000, "pricing": {"prompt": "3.00", "completion": "15.00"}, "description": "Great balance of quality and speed"},
     {"id": "anthropic/claude-3-haiku", "name": "Claude 3 Haiku", "context_length": 200000, "pricing": {"prompt": "0.25", "completion": "1.25"}, "description": "Fast and affordable"},
     {"id": "openai/gpt-4o", "name": "GPT-4o", "context_length": 128000, "pricing": {"prompt": "2.50", "completion": "10.00"}, "description": "OpenAI's flagship model"},
     {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini", "context_length": 128000, "pricing": {"prompt": "0.15", "completion": "0.60"}, "description": "Smaller, faster GPT-4o"},
@@ -174,7 +176,7 @@ def init_settings_state() -> None:
         st.session_state.settings = {
             "api_provider": "openrouter",
             "openrouter_api_key": loaded["openrouter_api_key"] or "",
-            "dm_model": loaded["dm_model"] or "google/gemini-2.5-pro-preview",
+            "dm_model": loaded["dm_model"] or "google/gemini-2.5-flash-preview",  # Good tool use support
             "vision_model": loaded["vision_model"] or "google/gemini-2.0-flash-001",
             "auto_save": True,
             "show_dice_details": True,

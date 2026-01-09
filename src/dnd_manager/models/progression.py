@@ -1058,6 +1058,92 @@ def get_ability_bonuses(race: str) -> dict[str, int]:
 
 
 # =============================================================================
+# Subclass Options by Class (PHB)
+# =============================================================================
+
+SUBCLASS_OPTIONS: dict[str, list[tuple[str, str]]] = {
+    # Format: (subclass_name, brief_description)
+    "Barbarian": [
+        ("Path of the Berserker", "Frenzied rage for relentless attacks"),
+        ("Path of the Totem Warrior", "Spirit animal grants special powers"),
+    ],
+    "Bard": [
+        ("College of Lore", "Extra skills and Cutting Words"),
+        ("College of Valor", "Combat training and Battle Magic"),
+    ],
+    "Cleric": [
+        ("Knowledge Domain", "Expertise and mind-reading magic"),
+        ("Life Domain", "Superior healing abilities"),
+        ("Light Domain", "Fire magic and radiant damage"),
+        ("Nature Domain", "Druidic spells and heavy armor"),
+        ("Tempest Domain", "Thunder and lightning powers"),
+        ("Trickery Domain", "Deception and illusion magic"),
+        ("War Domain", "Martial prowess and divine strikes"),
+    ],
+    "Druid": [
+        ("Circle of the Land", "Extra spells based on terrain"),
+        ("Circle of the Moon", "Powerful Wild Shape forms"),
+    ],
+    "Fighter": [
+        ("Champion", "Improved criticals and athleticism"),
+        ("Battle Master", "Tactical maneuvers in combat"),
+        ("Eldritch Knight", "Fighter-mage hybrid with spells"),
+    ],
+    "Monk": [
+        ("Way of the Open Hand", "Superior unarmed techniques"),
+        ("Way of Shadow", "Ninja-like stealth and darkness"),
+        ("Way of the Four Elements", "Elemental martial arts"),
+    ],
+    "Paladin": [
+        ("Oath of Devotion", "Classic holy warrior"),
+        ("Oath of the Ancients", "Nature-aligned protector"),
+        ("Oath of Vengeance", "Relentless enemy hunter"),
+    ],
+    "Ranger": [
+        ("Hunter", "Combat tactics against prey"),
+        ("Beast Master", "Animal companion fighter"),
+    ],
+    "Rogue": [
+        ("Thief", "Fast hands, climbing, magic item use"),
+        ("Assassin", "Deadly surprise attacks and infiltration"),
+        ("Arcane Trickster", "Rogue-mage with illusion and enchantment"),
+    ],
+    "Sorcerer": [
+        ("Draconic Bloodline", "Dragon ancestry grants power"),
+        ("Wild Magic", "Unpredictable magical surges"),
+    ],
+    "Warlock": [
+        ("The Archfey", "Fey patron with charm and illusion"),
+        ("The Fiend", "Fiendish patron with fire and dark powers"),
+        ("The Great Old One", "Eldritch patron with psychic abilities"),
+    ],
+    "Wizard": [
+        ("School of Abjuration", "Protective magic specialist"),
+        ("School of Conjuration", "Summoning and teleportation"),
+        ("School of Divination", "Fortune-telling and foresight"),
+        ("School of Enchantment", "Mind control specialist"),
+        ("School of Evocation", "Damage spell specialist"),
+        ("School of Illusion", "Deception through illusions"),
+        ("School of Necromancy", "Death magic and undead"),
+        ("School of Transmutation", "Transformation magic"),
+    ],
+}
+
+
+def get_subclass_options(class_name: str) -> list[tuple[str, str]]:
+    """Get available subclass options for a class."""
+    return SUBCLASS_OPTIONS.get(class_name, [])
+
+
+def get_subclass_level(class_name: str) -> int:
+    """Get the level at which a class chooses their subclass."""
+    # Most classes choose at level 3
+    if class_name in ("Cleric", "Sorcerer", "Warlock"):
+        return 1  # These choose at character creation
+    return 3
+
+
+# =============================================================================
 # Spellcasting Ability by Class
 # =============================================================================
 
@@ -1278,6 +1364,10 @@ __all__ = [
     "RACIAL_TRAITS",
     "get_racial_traits",
     "get_ability_bonuses",
+    # Subclasses
+    "SUBCLASS_OPTIONS",
+    "get_subclass_options",
+    "get_subclass_level",
     # Creature morale
     "CREATURE_MORALE",
     "DEFAULT_MORALE",

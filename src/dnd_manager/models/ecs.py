@@ -362,6 +362,9 @@ class HealthComponent(Component):
     
     Tracks current, maximum, and temporary HP along with
     death saving throw progress and active conditions.
+    
+    Accepts both field names (hp_current, hp_max, hp_temp) and
+    legacy aliases (current_hp, max_hp, temp_hp) for compatibility.
     """
     
     model_config = ConfigDict(
@@ -372,9 +375,9 @@ class HealthComponent(Component):
         populate_by_name=True,  # Allow both field name and alias
     )
 
-    hp_current: int = Field(default=10, ge=0, description="Current hit points", validation_alias="current_hp")
-    hp_max: int = Field(default=10, ge=1, description="Maximum hit points", validation_alias="max_hp")
-    hp_temp: int = Field(default=0, ge=0, description="Temporary hit points", validation_alias="temp_hp")
+    hp_current: int = Field(default=10, ge=0, description="Current hit points", alias="current_hp")
+    hp_max: int = Field(default=10, ge=1, description="Maximum hit points", alias="max_hp")
+    hp_temp: int = Field(default=0, ge=0, description="Temporary hit points", alias="temp_hp")
 
     death_saves_success: int = Field(default=0, ge=0, le=3)
     death_saves_failure: int = Field(default=0, ge=0, le=3)
@@ -630,26 +633,78 @@ class SpellbookComponent(Component):
     pact_slot_level: int = Field(default=0, ge=0, le=5)
 
     def has_slot(self, level: int) -> bool:
-        """Check if a spell slot of the given level is available."""
+        """Check if a spell slot of the given level is available.
+        
+        Checks both regular spell slots and Warlock pact magic slots.
+        
+        Args:
+            level: Spell level (0 for cantrips).
+        
+        Returns:
+            True if a slot is available, False otherwise.
+        """
         if level == 0:
             return True  # Cantrips don't use slots
+        
+        # Check pact magic slots (Warlock)
+        if self.pact_slots_current > 0 and self.pact_slot_level >= level:
+            return True
+        
+        # Check regular spell slots
         current, _ = self.spell_slots.get(level, (0, 0))
         return current > 0
 
-    def use_slot(self, level: int) -> bool:
-        """Use a spell slot. Returns success."""
+    def use_slot(self, level: int, prefer_pact: bool = True) -> bool:
+        """Use a spell slot, optionally preferring Warlock pact magic.
+        
+        Warlock pact magic is restored on short rest, while regular slots
+        require long rest. This method prefers pact slots by default to
+        conserve long-rest resources.
+        
+        Args:
+            level: Spell level to cast (0 for cantrips).
+            prefer_pact: If True, use pact slots before regular slots.
+        
+        Returns:
+            True if a slot was used, False if no slots available.
+        """
         if level == 0:
-            return True
+            return True  # Cantrips don't use slots
+        
+        # Warlock pact magic: use pact slots if available and high enough level
+        if prefer_pact and self.pact_slots_current > 0:
+            if self.pact_slot_level >= level:
+                self.pact_slots_current -= 1
+                return True
+        
+        # Fall back to regular spell slots
         if level not in self.spell_slots:
+            # Try pact slots even if prefer_pact was False
+            if self.pact_slots_current > 0 and self.pact_slot_level >= level:
+                self.pact_slots_current -= 1
+                return True
             return False
+        
         current, max_slots = self.spell_slots[level]
         if current <= 0:
+            # Last resort: try pact slots if prefer_pact was False
+            if not prefer_pact and self.pact_slots_current > 0 and self.pact_slot_level >= level:
+                self.pact_slots_current -= 1
+                return True
             return False
+        
         self.spell_slots[level] = (current - 1, max_slots)
         return True
 
     def restore_slots(self, level: int | None = None) -> None:
-        """Restore spell slots. If level is None, restore all."""
+        """Restore spell slots (long rest). If level is None, restore all.
+        
+        Note: This does NOT restore pact magic slots. Use restore_pact_slots()
+        for short rest restoration of Warlock slots.
+        
+        Args:
+            level: Specific spell level to restore, or None for all levels.
+        """
         if level is None:
             for lvl in self.spell_slots:
                 _, max_slots = self.spell_slots[lvl]
@@ -657,6 +712,10 @@ class SpellbookComponent(Component):
         elif level in self.spell_slots:
             _, max_slots = self.spell_slots[level]
             self.spell_slots[level] = (max_slots, max_slots)
+    
+    def restore_pact_slots(self) -> None:
+        """Restore Warlock pact magic slots (short rest or long rest)."""
+        self.pact_slots_current = self.pact_slots_max
 
 
 class JournalComponent(Component):
@@ -1052,6 +1111,50 @@ class ActorEntity(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
+    @model_validator(mode="after")
+    def validate_ability_score_caps(self) -> Self:
+        """Enforce D&D 5E ability score caps based on actor type.
+        
+        Player characters have a cap of 20 (or 24 for STR/CON if level 20 Barbarian).
+        Monsters can have ability scores up to 30.
+        """
+        if self.type == ActorType.PLAYER:
+            # Import constants here to avoid circular dependency
+            from dnd_manager.core.constants import PC_ABILITY_SCORE_CAP, BARBARIAN_CAPSTONE_CAP
+            
+            cap = PC_ABILITY_SCORE_CAP  # Default 20
+            
+            # Check for Barbarian capstone (Primal Champion at level 20)
+            if self.class_features:
+                for cls_level in self.class_features.classes:
+                    if cls_level.class_name.lower() == "barbarian" and cls_level.level >= 20:
+                        # Barbarian Primal Champion: +4 to STR and CON, max 24
+                        # Only apply 24 cap to STR and CON
+                        if self.stats.strength > BARBARIAN_CAPSTONE_CAP:
+                            self.stats.strength = BARBARIAN_CAPSTONE_CAP
+                        if self.stats.constitution > BARBARIAN_CAPSTONE_CAP:
+                            self.stats.constitution = BARBARIAN_CAPSTONE_CAP
+                        # Other stats still capped at 20
+                        cap = PC_ABILITY_SCORE_CAP
+                        break
+                else:
+                    # No level 20 Barbarian found, all stats capped at 20
+                    cap = PC_ABILITY_SCORE_CAP
+            
+            # Apply cap to all abilities (STR/CON may have been handled above)
+            for attr in ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]:
+                val = getattr(self.stats, attr, 10)
+                # For STR/CON with Barbarian capstone, already handled above
+                if attr in ("strength", "constitution") and self.class_features:
+                    for cls_level in self.class_features.classes:
+                        if cls_level.class_name.lower() == "barbarian" and cls_level.level >= 20:
+                            continue  # Already capped at 24
+                # Cap all other abilities at 20
+                if val > cap:
+                    setattr(self.stats, attr, cap)
+        
+        return self
+
     @computed_field(description="Armor Class")
     @property
     def ac(self) -> int:
@@ -1077,12 +1180,25 @@ class ActorEntity(BaseModel):
         return "Level 0"
 
     def to_summary(self) -> str:
-        """Get a brief summary for AI context."""
+        """Get a brief summary for AI context.
+        
+        Includes key mechanical information the DM needs:
+        - Basic stats (HP, AC)
+        - Equipped items
+        - Resistances/immunities
+        - Key features (Sneak Attack, Darkvision, etc.)
+        - Active conditions
+        - Cantrips/spells (for racial magic)
+        """
         status = "conscious" if self.health.is_conscious else "unconscious"
         if self.health.is_dead:
             status = "dead"
 
         hp_str = f"{self.health.hp_current}/{self.health.hp_max}"
+        
+        # Build parts list for cleaner formatting
+        parts = [f"{self.name} ({self.race} {self.level_display})"]
+        parts.append(f"HP: {hp_str}, AC: {self.ac}")
         
         # Include equipped weapons/items
         equipment = []
@@ -1090,10 +1206,59 @@ class ActorEntity(BaseModel):
             for item in self.inventory.items:
                 if item.equipped:
                     equipment.append(item.name)
+        if equipment:
+            parts.append(f"Equipped: {', '.join(equipment)}")
         
-        equip_str = f", Equipped: {', '.join(equipment)}" if equipment else ""
+        # Include resistances/immunities (important for combat!)
+        if self.defense:
+            if self.defense.resistances:
+                res_names = [r.value if hasattr(r, 'value') else str(r) for r in self.defense.resistances]
+                parts.append(f"Resist: {', '.join(res_names)}")
+            if self.defense.immunities:
+                imm_names = [i.value if hasattr(i, 'value') else str(i) for i in self.defense.immunities]
+                parts.append(f"Immune: {', '.join(imm_names)}")
+        
+        # Include key features the DM should know about
+        key_features = []
+        if self.class_features and self.class_features.features:
+            for feature in self.class_features.features:
+                feature_lower = feature.lower()
+                # Always include these mechanically important features
+                if any(kw in feature_lower for kw in [
+                    "sneak attack", "rage", "wild shape", "channel divinity",
+                    "action surge", "second wind", "cunning action", "evasion",
+                    "uncanny dodge", "darkvision", "pack tactics", "multiattack",
+                    "spellcasting", "innate spellcasting", "breath weapon",
+                    "resistance", "immunity", "advantage", "expertise",
+                    "ki", "lay on hands", "divine smite", "metamagic",
+                ]):
+                    key_features.append(feature)
+        if key_features:
+            parts.append(f"Features: {', '.join(key_features[:5])}")  # Limit to 5
+        
+        # Include available resources (Ki, Rage uses, etc.)
+        if self.class_features and self.class_features.resources:
+            resource_strs = []
+            for name, (current, max_val) in self.class_features.resources.items():
+                if max_val > 0:
+                    resource_strs.append(f"{name}: {current}/{max_val}")
+            if resource_strs:
+                parts.append(f"Resources: {', '.join(resource_strs)}")
+        
+        # Include cantrips (important for racial spellcasting like Tiefling)
+        if self.spellbook and self.spellbook.cantrips:
+            parts.append(f"Cantrips: {', '.join(self.spellbook.cantrips)}")
+        
+        # Include active conditions
+        if self.health.conditions:
+            cond_names = [c.value for c in self.health.conditions]
+            parts.append(f"Conditions: {', '.join(cond_names)}")
+        
+        # Status at the end
+        if status != "conscious":
+            parts.append(f"Status: {status}")
 
-        return f"{self.name} ({self.race} {self.level_display}) - HP: {hp_str}, AC: {self.ac}, Status: {status}{equip_str}"
+        return " | ".join(parts)
 
     def add_xp(self, amount: int) -> bool:
         """Add XP and check for level up.
@@ -1788,9 +1953,23 @@ class GameState(BaseModel):
         
         This is the read-only view that LLMs receive.
         """
+        party = self.get_party()
+        party_size = len(party)
+        
+        # PROMINENT party size warning for encounter balancing
+        if party_size == 1:
+            party_warning = "⚠️ **SOLO PLAYER** - Scale encounters DOWN significantly!"
+        elif party_size == 2:
+            party_warning = "⚠️ **SMALL PARTY (2)** - Reduce encounter sizes by ~50%"
+        elif party_size == 3:
+            party_warning = "**SMALL PARTY (3)** - Reduce encounter sizes by ~30%"
+        else:
+            party_warning = f"**Party of {party_size}** - Standard encounter balance"
+        
         lines = [
             f"# Game State - {self.campaign_name}",
             f"Location: {self.current_scene}",
+            party_warning,
             "",
         ]
 
@@ -1799,8 +1978,8 @@ class GameState(BaseModel):
             lines.append("")
 
         # Party status
-        lines.append("## Party")
-        for actor in self.get_party():
+        lines.append(f"## Party ({party_size} member{'s' if party_size != 1 else ''})")
+        for actor in party:
             lines.append(f"- {actor.to_summary()}")
         lines.append("")
 

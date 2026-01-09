@@ -556,7 +556,7 @@ def create_dm_tools(
         )
 
     def handle_get_character_status(character_name: str) -> ToolResult:
-        """Get the current status of a character."""
+        """Get the current status of a character including features and abilities."""
         actor = None
         for a in game_state.actors.values():
             if a.name.lower() == character_name.lower():
@@ -576,15 +576,58 @@ def create_dm_tools(
             f"AC: {actor.ac}",
         ]
 
+        # Ability scores
+        if actor.stats:
+            status_lines.append(
+                f"STR {actor.stats.strength} ({actor.stats.str_mod:+d}) | "
+                f"DEX {actor.stats.dexterity} ({actor.stats.dex_mod:+d}) | "
+                f"CON {actor.stats.constitution} ({actor.stats.con_mod:+d}) | "
+                f"INT {actor.stats.intelligence} ({actor.stats.int_mod:+d}) | "
+                f"WIS {actor.stats.wisdom} ({actor.stats.wis_mod:+d}) | "
+                f"CHA {actor.stats.charisma} ({actor.stats.cha_mod:+d})"
+            )
+
+        # Resistances and immunities (critical for combat!)
+        if actor.defense:
+            if actor.defense.resistances:
+                res_names = [r.value if hasattr(r, 'value') else str(r) for r in actor.defense.resistances]
+                status_lines.append(f"**Resistances:** {', '.join(res_names)}")
+            if actor.defense.immunities:
+                imm_names = [i.value if hasattr(i, 'value') else str(i) for i in actor.defense.immunities]
+                status_lines.append(f"**Immunities:** {', '.join(imm_names)}")
+            if actor.defense.vulnerabilities:
+                vuln_names = [v.value if hasattr(v, 'value') else str(v) for v in actor.defense.vulnerabilities]
+                status_lines.append(f"**Vulnerabilities:** {', '.join(vuln_names)}")
+
         if actor.health.conditions:
             conditions = ", ".join(str(c) for c in actor.health.conditions)
-            status_lines.append(f"Conditions: {conditions}")
+            status_lines.append(f"**Conditions:** {conditions}")
 
-        if actor.spellbook and actor.spellbook.spell_slots:
-            slots = []
-            for level, (current, max_val) in actor.spellbook.spell_slots.items():
-                slots.append(f"L{level}: {current}/{max_val}")
-            status_lines.append(f"Spell Slots: {', '.join(slots)}")
+        # Class features and resources
+        if actor.class_features:
+            if actor.class_features.features:
+                status_lines.append(f"**Features:** {', '.join(actor.class_features.features)}")
+            if actor.class_features.resources:
+                resource_strs = []
+                for name, (current, max_val) in actor.class_features.resources.items():
+                    if max_val > 0:
+                        resource_strs.append(f"{name}: {current}/{max_val}")
+                if resource_strs:
+                    status_lines.append(f"**Resources:** {', '.join(resource_strs)}")
+
+        # Spellcasting
+        if actor.spellbook:
+            if actor.spellbook.cantrips:
+                status_lines.append(f"**Cantrips:** {', '.join(actor.spellbook.cantrips)}")
+            if actor.spellbook.spells_known:
+                status_lines.append(f"**Spells Known:** {', '.join(actor.spellbook.spells_known)}")
+            if actor.spellbook.spell_slots:
+                slots = []
+                for level, (current, max_val) in sorted(actor.spellbook.spell_slots.items()):
+                    if max_val > 0:
+                        slots.append(f"L{level}: {current}/{max_val}")
+                if slots:
+                    status_lines.append(f"**Spell Slots:** {', '.join(slots)}")
         
         # Include inventory and equipment
         if actor.inventory and actor.inventory.items:
@@ -592,9 +635,9 @@ def create_dm_tools(
             other_items = [item.name for item in actor.inventory.items if not item.equipped]
             
             if equipped:
-                status_lines.append(f"Equipped: {', '.join(equipped)}")
+                status_lines.append(f"**Equipped:** {', '.join(equipped)}")
             if other_items:
-                status_lines.append(f"Inventory: {', '.join(other_items[:10])}")  # Limit to 10
+                status_lines.append(f"**Inventory:** {', '.join(other_items[:10])}")
 
         return ToolResult(
             tool_name="get_character_status",
@@ -605,6 +648,9 @@ def create_dm_tools(
                 "hp_current": actor.health.hp_current,
                 "hp_max": actor.health.hp_max,
                 "ac": actor.ac,
+                "features": actor.class_features.features if actor.class_features else [],
+                "resistances": [r.value if hasattr(r, 'value') else str(r) for r in actor.defense.resistances] if actor.defense else [],
+                "cantrips": actor.spellbook.cantrips if actor.spellbook else [],
             },
         )
 
@@ -3527,7 +3573,85 @@ If you narrate combat actions without tool calls, the game state becomes corrupt
    - Use award_xp to give XP to the party (auto-splits among members)
    - Also award XP for non-combat achievements (roleplay, puzzles, objectives)
 
-10. **🏃 ENEMY MORALE & FLEEING (IMPORTANT!)**:
+10. **🗣️ SOCIAL ENCOUNTERS & NON-COMBAT RESOLUTION (THIS IS NOT POKEMON!)**:
+   
+   **COMBAT SHOULD BE A CHOICE, NOT AN INEVITABILITY.**
+   
+   Before rolling initiative, ALWAYS consider:
+   - Can the player TALK their way out of this?
+   - Do these enemies even WANT to fight?
+   - What do the enemies actually want? (gold? food? territory? respect?)
+   
+   **OFFER SOCIAL OPTIONS FIRST:**
+   - When enemies appear, describe their demeanor - are they aggressive, cautious, curious?
+   - Let the player speak first if they want to
+   - "The goblin raises its spear but hesitates, eyeing your equipment..."
+   - "The bandits step out, but their leader holds up a hand - 'Hold. Let's hear what they have to say.'"
+   
+   **CHARISMA SKILLS RESOLVE ENCOUNTERS:**
+   - **Persuasion**: Convince enemies to let you pass, share information, or ally with you
+   - **Intimidation**: Scare enemies into fleeing, surrendering, or backing down
+   - **Deception**: Trick enemies into believing a lie, letting their guard down
+   - **Performance**: Distract, entertain, or confuse enemies
+   
+   **SOCIAL ENCOUNTER DCs:**
+   - Hostile but reasonable: DC 20 Persuasion, DC 15 Intimidation
+   - Unfriendly/suspicious: DC 15 Persuasion, DC 15 Intimidation  
+   - Indifferent: DC 10 Persuasion, DC 10 Intimidation
+   - Already inclined to help: DC 5-10
+   
+   **ENEMIES HAVE MOTIVATIONS:**
+   - Bandits want gold - they might accept a bribe or toll
+   - Guards want to do their job - a good excuse might work
+   - Monsters might be territorial - leaving their area could end it
+   - Cultists want converts - pretending interest could buy time
+   - Hungry beasts want food - throwing rations might distract them
+   
+   **REWARD CLEVER ROLEPLAY:**
+   - Award XP for encounters resolved without bloodshed (same as combat XP!)
+   - A silver-tongued rogue who talks past 4 goblins deserves XP for 4 goblins
+   - Give advantage on social checks for clever arguments or good roleplay
+   
+   **COMBAT AS LAST RESORT:**
+   - If the player attacks first, enemies respond in kind
+   - If negotiation fails badly (nat 1, insulting offer), combat may begin
+   - But even mid-combat, surrender and parley should remain options
+   
+   **EXAMPLE:** Instead of "4 kobolds attack!"
+   > "Four small, reptilian figures emerge from the shadows, chittering nervously. They brandish crude spears but don't advance immediately. One, slightly larger than the others, squints at you with suspicious yellow eyes. It speaks in broken Common: 'You... not belong here. What you want?'"
+
+12. **⚖️ ENCOUNTER BALANCE (CRITICAL FOR SOLO PLAYERS!)**:
+   
+   **CHECK PARTY SIZE BEFORE COMBAT!** Count the party members in the game state.
+   
+   **SOLO PLAYER RULES (1 party member):**
+   - A solo level 1 character can handle AT MOST 1-2 weak enemies (CR 1/8 each)
+   - NEVER throw 3+ enemies at a solo player early on - it's almost certain death
+   - Prefer 1-on-1 encounters or give the player NPC allies
+   - Use weaker variants: "a young/injured/cowardly kobold" instead of normal ones
+   - Let enemies flee early or give chances to avoid combat
+   - If an adventure says "4 goblins attack", scale down to 1-2 for solo play
+   
+   **SOLO ENCOUNTER GUIDELINES BY LEVEL:**
+   - Level 1: Max 1 CR 1/4 enemy OR 2 CR 1/8 enemies
+   - Level 2-3: Max 1 CR 1/2 enemy OR 2-3 CR 1/4 enemies  
+   - Level 4-5: Max 1 CR 1 enemy OR 2 CR 1/2 enemies
+   
+   **SMALL PARTY RULES (2-3 party members):**
+   - Reduce encounter sizes by 30-50% from what modules suggest
+   - 2 players = halve the number of enemies
+   - 3 players = reduce by about a third
+   
+   **GIVE SOLO PLAYERS OPTIONS:**
+   - Let them sneak past encounters (Stealth checks)
+   - Provide NPC hirelings or allies when possible
+   - Allow clever tactics to even the odds
+   - Enemies can be bribed, distracted, or scared off
+   - If overwhelmed, give chances to flee or surrender
+   
+   **REMEMBER**: The goal is FUN, not a meat grinder. A solo rogue shouldn't face a squad of enemies!
+
+13. **🏃 ENEMY MORALE & FLEEING (IMPORTANT!)**:
    
    **Morale is a GUIDE, not a rule. YOU (the DM) have final say on whether enemies flee!**
    
@@ -3825,13 +3949,32 @@ class DMOrchestrator:
             current_name = current.name if current else "unknown"
             combat_reminder = (
                 f"\n\n⚔️ COMBAT IS ACTIVE - Round {self.game_state.combat_round}\n"
-                f"Current turn: {current_name}\n"
-                f"⚠️ YOU MUST USE TOOLS: roll_attack, apply_damage, cast_spell, end_turn\n"
-                f"DO NOT narrate attacks or damage without calling tools first!"
+                f"Current turn: {current_name}\n\n"
+                f"🚨 CRITICAL TOOL REQUIREMENTS 🚨\n"
+                f"You MUST call tools BEFORE narrating outcomes:\n"
+                f"• roll_attack → then narrate hit/miss\n"
+                f"• apply_damage → then narrate damage\n"
+                f"• roll_check/roll_save → then narrate success/failure\n"
+                f"• end_turn → when combatant's turn is complete\n\n"
+                f"❌ FORBIDDEN: Writing dice numbers like 'rolls a 15' or 'deals 8 damage' without tool calls!\n"
+                f"❌ FORBIDDEN: Narrating outcomes before calling the appropriate tool!\n"
+                f"✅ CORRECT: Call roll_attack first, THEN describe the result based on tool output."
             )
             messages.append({
                 "role": "system", 
                 "content": combat_reminder
+            })
+        
+        # Also add a general dice reminder for non-combat
+        else:
+            dice_reminder = (
+                "Remember: For ANY dice rolls (skill checks, saving throws, etc.), "
+                "you MUST call the appropriate tool (roll_check, roll_save, roll_dice) FIRST, "
+                "then narrate based on the result. Never invent dice numbers!"
+            )
+            messages.append({
+                "role": "system",
+                "content": dice_reminder
             })
 
         # Add current user input
