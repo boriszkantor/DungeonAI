@@ -14,24 +14,23 @@ Dice rolls use the d20 library - LLMs NEVER generate random numbers.
 
 from __future__ import annotations
 
-from dnd_manager.dm.orchestrator import (
-    DMOrchestrator,
-    DMResponse,
-    DMTool,
-    ToolResult,
-    roll_dice,
-    roll_check,
-    roll_save,
+from .dice import (
+    DiceResult,
     roll_attack,
+    roll_check,
     roll_damage,
+    roll_dice,
+    roll_save,
 )
-
+from .orchestrator import DMOrchestrator, DMResponse
+from .tools.base import DMTool, ToolResult
 
 __all__ = [
     "DMOrchestrator",
     "DMResponse",
     "DMTool",
     "ToolResult",
+    "DiceResult",
     "roll_dice",
     "roll_check",
     "roll_save",
