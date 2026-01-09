@@ -4,12 +4,29 @@ A production-grade, AI-powered campaign management system for Dungeons & Dragons
 
 ## Features
 
-- 🎲 **Dice Rolling Engine** - Full D&D 5E dice mechanics with advantage, disadvantage, and critical hits
-- ⚔️ **Combat Tracker** - Initiative tracking, turn management, and action economy
-- 📖 **Campaign Management** - Scenes, sessions, and campaign state persistence
+### Core Gameplay
+- 🎲 **Advanced Dice Rolling** - Full D&D 5E mechanics with advantage, disadvantage, and 3 critical hit variants
+- ⚔️ **Combat Tracker** - Initiative tracking with actual DEX modifiers, turn management, and action economy
+- 📖 **Campaign Management** - Scenes, sessions, and campaign state persistence with SQLite
+- 👥 **Character Management** - Complete character creation with intelligent Standard Array and Half-Elf ability choices
+- 📄 **PDF Export** - Export character sheets to fillable PDF documents
+
+### AI & Automation
 - 🤖 **AI Integration** - Gemini and OpenAI support for DM assistance
-- 📚 **RAG Pipeline** - PDF ingestion and semantic search for rulebooks
-- 🖥️ **Streamlit UI** - Modern web interface for campaign management
+- 📚 **RAG Pipeline** - PDF ingestion and semantic search for rulebooks with ChromaDB
+- 🔮 **Vision AI** - Automatic character sheet extraction from uploaded PDFs
+
+### D&D 5E Accuracy
+- ✨ **Warlock Pact Magic** - Proper pact slot handling with short rest recovery
+- 🎯 **Ability Score Caps** - Automatic validation (20 for PCs, 24 for level 20 Barbarians)
+- 🎲 **Critical Hit Options** - Choose between double dice, double damage, or max+roll
+- 🧝 **Racial Features** - Full support including Half-Elf ability score choices
+
+### User Experience
+- 🖥️ **Modern UI** - Streamlit interface with custom D&D theme
+- 🎨 **Dice Animations** - Visual feedback for rolls with special effects for nat 20s/nat 1s
+- 💬 **Chat Pagination** - Smooth performance with long conversation histories
+- 📱 **Responsive Design** - Works on desktop and mobile devices
 
 ## Architecture
 
