@@ -92,7 +92,3 @@ pytest
 ruff check src
 mypy src
 ```
-
-## License
-
-MIT
