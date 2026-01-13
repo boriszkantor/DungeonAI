@@ -19,21 +19,6 @@ from .state import init_session_state
 
 
 # =============================================================================
-# Page Configuration
-# =============================================================================
-
-
-st.set_page_config(
-    page_title="Characters | DungeonAI",
-    page_icon="🧙",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-apply_theme()
-
-
-# =============================================================================
 # Main Page
 # =============================================================================
 
@@ -64,11 +49,30 @@ def main() -> None:
         render_character_creator()
 
 
-# =============================================================================
-# Entry Point
-# =============================================================================
+def setup_and_run() -> None:
+    """Setup page configuration and run the main function.
+    
+    This should only be called from the Streamlit page file (2_Characters.py).
+    """
+    st.set_page_config(
+        page_title="Characters | DungeonAI",
+        page_icon="🧙",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+    
+    apply_theme()
+    init_session_state()
+    render_sidebar()
+    main()
 
 
-init_session_state()
-render_sidebar()
-main()
+# Export the main components
+__all__ = [
+    "main",
+    "setup_and_run",
+    "render_character_creator",
+    "render_character_list",
+    "render_sidebar",
+    "init_session_state",
+]

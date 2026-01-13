@@ -176,7 +176,7 @@ def init_settings_state() -> None:
         st.session_state.settings = {
             "api_provider": "openrouter",
             "openrouter_api_key": loaded["openrouter_api_key"] or "",
-            "dm_model": loaded["dm_model"] or "google/gemini-2.5-flash-preview",  # Good tool use support
+            "dm_model": loaded["dm_model"] or "google/gemini-3-pro-preview",  # Default model
             "vision_model": loaded["vision_model"] or "google/gemini-2.0-flash-001",
             "auto_save": True,
             "show_dice_details": True,

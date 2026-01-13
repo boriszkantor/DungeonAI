@@ -1055,20 +1055,30 @@ class UniversalIngestor:
     
     Handles all document types through a unified interface:
     - Character sheets → Vision pipeline → ActorEntity
-    - Rulebooks → Markdown → ChromaDB
+    - Rulebooks → Markdown → ChromaDB + Knowledge Graph
     - Adventure modules → Markdown → ChromaDB
+    
+    The Knowledge Graph pipeline (for rulebooks):
+    1. PDF → Markdown → Chunks → ChromaDB (vector store)
+    2. Chunks → LLM Triple Extraction → Entity Resolution → NetworkX Graph
+    3. Graph enables multi-hop reasoning for "specific beats general" rules
     """
 
     def __init__(
         self,
         chroma_store: ChromaStore | None = None,
         openrouter_client: OpenRouterClient | None = None,
+        *,
+        enable_knowledge_graph: bool = True,
+        graph_persist_path: str | Path | None = None,
     ) -> None:
         """Initialize the universal ingestor.
         
         Args:
             chroma_store: ChromaDB store for RAG documents.
             openrouter_client: OpenRouter client for vision extraction.
+            enable_knowledge_graph: Whether to build knowledge graph during ingestion.
+            graph_persist_path: Path to persist/load the knowledge graph.
         """
         self.chroma_store = chroma_store or ChromaStore()
         self.openrouter_client = openrouter_client or OpenRouterClient()
@@ -1076,6 +1086,104 @@ class UniversalIngestor:
             client=self.openrouter_client,
             chroma_store=self.chroma_store,
         )
+        
+        # Knowledge Graph components
+        self.enable_knowledge_graph = enable_knowledge_graph
+        self.graph_persist_path = Path(graph_persist_path) if graph_persist_path else None
+        self._knowledge_graph: Any = None
+        self._triple_extractor: Any = None
+        self._entity_resolver: Any = None
+        self._ontology_schema: Any = None
+
+    def _get_ontology_schema(self) -> Any:
+        """Get or create the ontology schema."""
+        if self._ontology_schema is None:
+            from dnd_manager.ingestion.ontology import OntologySchema
+            self._ontology_schema = OntologySchema.load_default()
+        return self._ontology_schema
+
+    def _get_entity_resolver(self) -> Any:
+        """Get or create the entity resolver."""
+        if self._entity_resolver is None:
+            from dnd_manager.ingestion.entity_resolver import EntityResolver
+            self._entity_resolver = EntityResolver.from_schema(self._get_ontology_schema())
+        return self._entity_resolver
+
+    def _get_triple_extractor(self) -> Any:
+        """Get or create the triple extractor."""
+        if self._triple_extractor is None:
+            from dnd_manager.ingestion.triple_extractor import TripleExtractor
+            self._triple_extractor = TripleExtractor(self._get_ontology_schema())
+        return self._triple_extractor
+
+    def _get_knowledge_graph(self) -> Any:
+        """Get or create the knowledge graph."""
+        if self._knowledge_graph is None:
+            from dnd_manager.ingestion.knowledge_graph import DnDKnowledgeGraph
+            
+            self._knowledge_graph = DnDKnowledgeGraph(
+                schema=self._get_ontology_schema(),
+                entity_resolver=self._get_entity_resolver(),
+            )
+            
+            # Load from disk if path exists
+            if self.graph_persist_path and self.graph_persist_path.exists():
+                self._knowledge_graph.load(self.graph_persist_path)
+                logger.info(f"Loaded knowledge graph from {self.graph_persist_path}")
+            else:
+                # Load seed data
+                self._knowledge_graph.load_seed_data()
+                
+        return self._knowledge_graph
+
+    @property
+    def knowledge_graph(self) -> Any:
+        """Access the knowledge graph (creates if needed)."""
+        return self._get_knowledge_graph()
+
+    def _extract_triples_from_chunks(
+        self,
+        chunks: list[ChunkedDocument],
+        *,
+        progress_callback: Any = None,
+    ) -> int:
+        """Extract triples from chunks and add to knowledge graph.
+        
+        Args:
+            chunks: Document chunks to process.
+            progress_callback: Optional callback(current, total, chunk_id).
+            
+        Returns:
+            Number of triples added to the graph.
+        """
+        if not self.enable_knowledge_graph:
+            return 0
+            
+        extractor = self._get_triple_extractor()
+        resolver = self._get_entity_resolver()
+        graph = self._get_knowledge_graph()
+        
+        # Extract triples
+        valid_triples, stats = extractor.extract_batch(
+            chunks,
+            progress_callback=progress_callback,
+        )
+        
+        logger.info(
+            f"Extracted {stats.valid_triples} valid triples from {stats.total_chunks} chunks "
+            f"(estimated cost: ${stats.estimated_cost:.4f})"
+        )
+        
+        # Resolve entities and add to graph
+        resolved_triples = resolver.resolve_triples(valid_triples)
+        count = graph.add_triples(resolved_triples)
+        
+        # Persist graph if path configured
+        if self.graph_persist_path:
+            graph.save(self.graph_persist_path)
+            logger.info(f"Saved knowledge graph to {self.graph_persist_path}")
+        
+        return count
 
     def detect_document_type(self, pdf_path: str | Path) -> DocumentType:
         """Detect the type of document based on content.
@@ -1118,15 +1226,21 @@ class UniversalIngestor:
         self,
         pdf_path: str | Path,
         source_name: str | None = None,
-    ) -> int:
-        """Ingest a rulebook PDF into ChromaDB.
+        *,
+        extract_knowledge_graph: bool | None = None,
+        progress_callback: Any = None,
+    ) -> dict[str, int]:
+        """Ingest a rulebook PDF into ChromaDB and Knowledge Graph.
         
         Args:
             pdf_path: Path to PDF file.
             source_name: Name for the source (defaults to filename).
+            extract_knowledge_graph: Whether to extract knowledge graph triples.
+                                     Defaults to self.enable_knowledge_graph.
+            progress_callback: Optional callback(current, total, chunk_id) for progress.
             
         Returns:
-            Number of chunks added.
+            Dictionary with 'chunks_added' and 'triples_added' counts.
         """
         path = Path(pdf_path)
         source = source_name or path.stem
@@ -1142,7 +1256,22 @@ class UniversalIngestor:
         )
 
         # Add to ChromaDB
-        return self.chroma_store.add_documents(chunks)
+        chunks_added = self.chroma_store.add_documents(chunks)
+        
+        # Extract knowledge graph triples if enabled
+        should_extract = extract_knowledge_graph if extract_knowledge_graph is not None else self.enable_knowledge_graph
+        triples_added = 0
+        
+        if should_extract:
+            triples_added = self._extract_triples_from_chunks(
+                chunks,
+                progress_callback=progress_callback,
+            )
+        
+        return {
+            "chunks_added": chunks_added,
+            "triples_added": triples_added,
+        }
 
     def ingest_adventure_module(
         self,
@@ -1179,7 +1308,9 @@ class UniversalIngestor:
         self,
         pdf_source: str | bytes | Path,
         doc_type: DocumentType | None = None,
-    ) -> ActorEntity | int:
+        *,
+        extract_knowledge_graph: bool | None = None,
+    ) -> ActorEntity | dict[str, int] | int:
         """Ingest a document automatically.
         
         Detects type if not provided and routes to appropriate handler.
@@ -1187,9 +1318,11 @@ class UniversalIngestor:
         Args:
             pdf_source: Path to PDF or raw bytes.
             doc_type: Document type (auto-detected if None).
+            extract_knowledge_graph: Whether to extract knowledge graph (rulebooks only).
             
         Returns:
-            ActorEntity for character sheets, chunk count otherwise.
+            ActorEntity for character sheets, dict with counts for rulebooks,
+            or chunk count for adventures.
         """
         # Detect type if not provided
         if doc_type is None:
@@ -1203,14 +1336,23 @@ class UniversalIngestor:
         if doc_type == DocumentType.CHARACTER_SHEET:
             return self.ingest_character_sheet(pdf_source)
         elif doc_type == DocumentType.SOURCEBOOK:
-            return self.ingest_rulebook(pdf_source)
+            return self.ingest_rulebook(
+                pdf_source, 
+                extract_knowledge_graph=extract_knowledge_graph,
+            )
         elif doc_type == DocumentType.ADVENTURE:
             return self.ingest_adventure_module(pdf_source)
         elif doc_type == DocumentType.THIRD_PARTY:
-            return self.ingest_rulebook(pdf_source)  # Treat like sourcebook
+            return self.ingest_rulebook(
+                pdf_source,
+                extract_knowledge_graph=extract_knowledge_graph,
+            )
         else:
             # Unknown - try as sourcebook
-            return self.ingest_rulebook(pdf_source)
+            return self.ingest_rulebook(
+                pdf_source,
+                extract_knowledge_graph=extract_knowledge_graph,
+            )
 
     def search(
         self,
@@ -1218,7 +1360,7 @@ class UniversalIngestor:
         n_results: int = 5,
         doc_type: DocumentType | None = None,
     ) -> list[ChunkedDocument]:
-        """Search ingested documents.
+        """Search ingested documents (vector search only).
         
         Args:
             query: Search query.
@@ -1229,6 +1371,68 @@ class UniversalIngestor:
             Matching documents.
         """
         return self.chroma_store.search(query, n_results, doc_type)
+
+    def hybrid_search(
+        self,
+        query: str,
+        *,
+        character: Any = None,
+        n_results: int = 5,
+    ) -> Any:
+        """Perform hybrid graph-vector search.
+        
+        Combines vector search with knowledge graph traversal to find
+        related rules (e.g., Evasion when searching for Fireball + Monk).
+        
+        Args:
+            query: Search query.
+            character: Optional ActorEntity for character-aware filtering.
+            n_results: Maximum vector results.
+            
+        Returns:
+            HybridSearchResult with vector results and related rules.
+        """
+        from dnd_manager.ingestion.hybrid_retriever import HybridRetriever
+        
+        retriever = HybridRetriever(
+            vector_store=self.chroma_store,
+            knowledge_graph=self._get_knowledge_graph(),
+            schema=self._get_ontology_schema(),
+        )
+        
+        return retriever.search(
+            query,
+            character=character,
+            n_results=n_results,
+        )
+
+    def get_hybrid_retriever(self) -> Any:
+        """Get a HybridRetriever for advanced search.
+        
+        Returns:
+            HybridRetriever configured with this ingestor's stores.
+        """
+        from dnd_manager.ingestion.hybrid_retriever import HybridRetriever
+        
+        return HybridRetriever(
+            vector_store=self.chroma_store,
+            knowledge_graph=self._get_knowledge_graph(),
+            schema=self._get_ontology_schema(),
+        )
+
+    def get_graph_stats(self) -> dict[str, Any]:
+        """Get knowledge graph statistics.
+        
+        Returns:
+            Dictionary of graph statistics.
+        """
+        if not self.enable_knowledge_graph:
+            return {"enabled": False}
+            
+        graph = self._get_knowledge_graph()
+        stats = graph.get_stats()
+        stats["enabled"] = True
+        return stats
 
 
 __all__ = [

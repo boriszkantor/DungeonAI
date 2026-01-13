@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -43,6 +44,51 @@ class ContentType(StrEnum):
     ADVENTURE_SCENE = "adventure_scene"
     CHARACTER = "character"
     CUSTOM = "custom"
+
+
+@dataclass
+class EnhancedMetadata:
+    """Enhanced metadata for game-aware retrieval filtering.
+    
+    This enables smart filtering based on character capabilities:
+    - "Can I cast Shield?" filters by class and spell level
+    - "Can I use Sneak Attack?" filters by class features
+    - "Can I run up this wall?" considers character level for Monk features
+    
+    Attributes:
+        doc_subtype: Specific type (spell, feat, class_feature, item, general_rule).
+        classes: List of classes that can use this (e.g., ["wizard", "sorcerer"]).
+        level_requirement: Minimum character level required.
+        prerequisites: Text description of prerequisites.
+        tags: Additional searchable tags.
+    """
+    
+    doc_subtype: str | None = None  # spell, feat, class_feature, item, general_rule
+    classes: list[str] = field(default_factory=list)  # ["wizard", "sorcerer", "bard"]
+    level_requirement: int | None = None  # Minimum level needed
+    prerequisites: list[str] = field(default_factory=list)  # ["Dexterity 13 or higher"]
+    tags: list[str] = field(default_factory=list)  # ["combat", "utility", "ritual"]
+    
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dict for storage."""
+        return {
+            "doc_subtype": self.doc_subtype,
+            "classes": self.classes,
+            "level_requirement": self.level_requirement,
+            "prerequisites": self.prerequisites,
+            "tags": self.tags,
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "EnhancedMetadata":
+        """Create from dict."""
+        return cls(
+            doc_subtype=data.get("doc_subtype"),
+            classes=data.get("classes", []),
+            level_requirement=data.get("level_requirement"),
+            prerequisites=data.get("prerequisites", []),
+            tags=data.get("tags", []),
+        )
 
 
 @dataclass
@@ -161,7 +207,7 @@ class EmbeddingProvider:
                 settings = get_settings()
 
                 if self.use_openrouter:
-                    api_key = settings.ai.openai_api_key
+                    api_key = settings.ai.openrouter_api_key  # Fixed: use openrouter_api_key
                     if api_key:
                         api_key = api_key.get_secret_value()
                     self._client = OpenAI(
@@ -830,14 +876,509 @@ class RAGStore:
     def document_count(self) -> int:
         """Total number of indexed documents."""
         return self.vector_store.count
+    
+    def retrieve_with_game_context(
+        self,
+        query: str,
+        *,
+        character: Any = None,  # ActorEntity type (avoid circular import)
+        game_state: Any = None,  # GameState type
+        k: int = 5,
+        filters: dict[str, Any] | None = None,
+    ) -> list[SearchResult]:
+        """Smart retrieval that filters by character capabilities and game state.
+        
+        This solves the "context confusion" problem:
+        - "Can I cast Shield?" → Filters by character class (Wizard = spell, Fighter = item)
+        - "Can I use Sneak Attack?" → Filters by class features
+        - "Can I run up this wall?" → Considers character level for Monk features
+        
+        Args:
+            query: Search query.
+            character: Optional character to filter by capabilities.
+            game_state: Optional game state for additional context.
+            k: Number of results.
+            filters: Base filters (will be enhanced with game context).
+            
+        Returns:
+            List of SearchResult objects filtered by game context.
+            
+        Example:
+            >>> # Wizard asking about Shield
+            >>> results = store.retrieve_with_game_context(
+            ...     "Can I cast Shield?",
+            ...     character=wizard_char,
+            ... )
+            >>> # Returns the Shield SPELL, not the item
+        """
+        enhanced_filters = filters.copy() if filters else {}
+        query_lower = query.lower()
+        
+        if character:
+            # Extract character info
+            char_classes = []
+            char_level = 1
+            has_spellcasting = False
+            
+            # Try to get character class and level
+            try:
+                if hasattr(character, 'class_levels'):
+                    for cls_lvl in character.class_levels:
+                        char_classes.append(cls_lvl.class_name.lower())
+                        char_level = max(char_level, cls_lvl.level)
+                elif hasattr(character, 'primary_class'):
+                    char_classes.append(character.primary_class.lower())
+                
+                if hasattr(character, 'level'):
+                    char_level = character.level
+                    
+                if hasattr(character, 'spellbook') and character.spellbook:
+                    has_spellcasting = True
+            except Exception:
+                pass  # Fallback to no filtering if character structure different
+            
+            # Smart filtering based on query type
+            if has_spellcasting and any(word in query_lower for word in ["cast", "spell", "magic"]):
+                # Character can cast spells, prioritize spell results
+                enhanced_filters["doc_subtype"] = "spell"
+                logger.debug("Filtering for spells based on character spellcasting")
+            
+            elif "feat" in query_lower and char_classes:
+                # Filter by class-appropriate feats
+                enhanced_filters["doc_subtype"] = "feat"
+            
+            elif any(word in query_lower for word in ["feature", "ability", "can i"]):
+                # Query about character abilities - filter by class
+                if char_classes and "classes" not in enhanced_filters:
+                    # Don't override if already specified
+                    # This will be used in post-filtering
+                    enhanced_filters["_char_classes"] = char_classes
+                    enhanced_filters["_char_level"] = char_level
+        
+        # Perform retrieval
+        results = self.retrieve_relevant_context(
+            query,
+            k=k * 2,  # Get more results for filtering
+            filters=enhanced_filters,
+        )
+        
+        # Post-filter by character class and level if needed
+        if "_char_classes" in enhanced_filters:
+            char_classes = enhanced_filters["_char_classes"]
+            char_level = enhanced_filters.get("_char_level", 1)
+            
+            filtered_results = []
+            for result in results:
+                # Check if content is relevant to character's classes
+                content_meta = result.content.metadata
+                
+                # Extract enhanced metadata if available
+                if "classes" in content_meta:
+                    content_classes = content_meta.get("classes", [])
+                    # Allow if no class restriction or matches character class
+                    if not content_classes or any(c in content_classes for c in char_classes):
+                        # Check level requirement
+                        level_req = content_meta.get("level_requirement")
+                        if level_req is None or char_level >= level_req:
+                            filtered_results.append(result)
+                else:
+                    # No class filtering in metadata, include it
+                    filtered_results.append(result)
+            
+            results = filtered_results[:k]
+        else:
+            results = results[:k]
+        
+        return results
+
+
+# =============================================================================
+# HyDE (Hypothetical Document Embeddings) Retriever
+# =============================================================================
+
+
+class HyDERetriever:
+    """Hypothetical Document Embeddings for semantic rule lookup.
+    
+    Instead of embedding the query directly, HyDE generates a hypothetical
+    document that would answer the query, embeds that, and searches.
+    
+    This solves the "vocabulary mismatch" problem where players describe
+    outcomes ("I want to jump on the ogre") rather than rule names
+    ("Falling onto a Creature - Tasha's Cauldron").
+    
+    Example:
+        Query: "Can I run up this wall?"
+        Hypothetical: "When a monk reaches 9th level, they gain Unarmored
+                       Movement which allows them to run up vertical surfaces..."
+        Search: Finds Monk class features, not just general movement rules.
+    """
+
+    def __init__(
+        self,
+        rag_store: RAGStore | Any,  # Accept RAGStore or ChromaStore
+        *,
+        model: str = "google/gemini-2.0-flash-001",
+        use_openrouter: bool = True,
+    ) -> None:
+        """Initialize the HyDE retriever.
+        
+        Args:
+            rag_store: The underlying RAG store to search (RAGStore or ChromaStore).
+            model: LLM model for hypothesis generation.
+            use_openrouter: Whether to use OpenRouter API.
+        """
+        self.rag_store = rag_store
+        self.model = model
+        self.use_openrouter = use_openrouter
+        self._client: Any = None
+        
+        # Detect store type
+        self._is_chroma_store = hasattr(rag_store, 'search') and not hasattr(rag_store, 'retrieve_relevant_context')
+        
+        logger.info(
+            "HyDERetriever initialized",
+            model=model,
+            store_type="ChromaStore" if self._is_chroma_store else "RAGStore",
+        )
+    
+    def _get_client(self) -> Any:
+        """Get or create the OpenAI client."""
+        if self._client is None:
+            try:
+                from openai import OpenAI
+                
+                settings = get_settings()
+                
+                if self.use_openrouter:
+                    api_key = settings.ai.openrouter_api_key  # Fixed: use openrouter_api_key
+                    if api_key:
+                        api_key = api_key.get_secret_value()
+                    self._client = OpenAI(
+                        api_key=api_key,
+                        base_url="https://openrouter.ai/api/v1",
+                        default_headers={
+                            "HTTP-Referer": "https://github.com/dnd-campaign-manager",
+                            "X-Title": "D&D Campaign Manager",
+                        },
+                    )
+                else:
+                    api_key = settings.ai.openai_api_key
+                    if api_key:
+                        api_key = api_key.get_secret_value()
+                    self._client = OpenAI(api_key=api_key)
+                    
+            except ImportError as exc:
+                raise EmbeddingError(
+                    "openai package not installed",
+                    model_name=self.model,
+                ) from exc
+        
+        return self._client
+    
+    def generate_hypothetical_rule(self, query: str) -> str:
+        """Generate a hypothetical D&D rule that would answer this query.
+        
+        Args:
+            query: The player's question or action description.
+            
+        Returns:
+            A hypothetical rule text that answers the query.
+            
+        Example:
+            >>> query = "Can I jump on the ogre from above?"
+            >>> hyp = generate_hypothetical_rule(query)
+            >>> print(hyp)
+            "When a creature falls onto another creature, both take falling
+             damage. The creature being fallen upon can make a DC 15 Dexterity
+             saving throw to avoid the damage..."
+        """
+        system_prompt = """You are a D&D 5E rules expert. Given a player's question or action,
+write a hypothetical D&D rule excerpt that would answer their question.
+
+Write as if you're quoting from the Player's Handbook or Dungeon Master's Guide.
+Be specific and use D&D terminology (saving throws, advantage, actions, etc.).
+Keep it concise (2-3 sentences)."""
+
+        user_prompt = f"""Player question/action: "{query}"
+
+Write a hypothetical D&D 5E rule that would answer this:"""
+
+        try:
+            from openai import APIConnectionError, APIStatusError, RateLimitError
+            
+            client = self._get_client()
+            
+            # Log to both structured logger and console for visibility
+            print(f"\n🔍 HyDE: Generating hypothetical with model: {self.model}")
+            print(f"   Query: {query[:80]}{'...' if len(query) > 80 else ''}")
+            
+            logger.info(
+                "Generating HyDE hypothetical",
+                model=self.model,
+                query_preview=query[:50],
+            )
+            
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.3,  # Lower temperature for more focused rules
+                max_tokens=200,
+            )
+            
+            hypothetical = response.choices[0].message.content
+            
+            # Handle empty or None responses
+            if not hypothetical or hypothetical.strip() == "":
+                print(f"   ⚠️  WARNING: LLM returned empty hypothetical, using original query")
+                logger.warning(
+                    "LLM returned empty hypothetical, using original query",
+                    model=self.model,
+                    response_object=str(response)[:200],
+                )
+                hypothetical = query
+            else:
+                print(f"   ✅ Generated: {hypothetical[:80]}{'...' if len(hypothetical) > 80 else ''}\n")
+                logger.info(
+                    "Generated hypothetical rule successfully",
+                    model=self.model,
+                    query=query[:50],
+                    hypothetical=hypothetical[:100],
+                )
+            
+            return hypothetical
+            
+        except RateLimitError as exc:
+            logger.warning(
+                "Rate limited during HyDE generation, falling back to query",
+                model=self.model,
+                error=str(exc),
+            )
+            return query
+        except (APIConnectionError, APIStatusError) as exc:
+            logger.warning(
+                f"API error during HyDE generation: {exc}, falling back to query",
+                model=self.model,
+                error_type=type(exc).__name__,
+            )
+            return query
+        except Exception as exc:
+            logger.exception(
+                "Failed to generate hypothetical rule",
+                model=self.model,
+                error_type=type(exc).__name__,
+            )
+            return query
+    
+    def retrieve_with_hyde(
+        self,
+        query: str,
+        *,
+        k: int = 5,
+        filters: dict[str, Any] | None = None,
+        fallback_to_direct: bool = True,
+    ) -> list[SearchResult]:
+        """Retrieve documents using HyDE approach.
+        
+        Args:
+            query: The player's question or action.
+            k: Number of results to return.
+            filters: Optional metadata filters.
+            fallback_to_direct: If True, also try direct query and merge results.
+            
+        Returns:
+            List of SearchResult objects.
+        """
+        # Generate hypothetical document
+        hypothetical = self.generate_hypothetical_rule(query)
+        
+        # Search with hypothetical (adapt to store type)
+        if self._is_chroma_store:
+            # Use ChromaStore.search()
+            from dnd_manager.ingestion.universal_loader import DocumentType
+            doc_type = DocumentType.SOURCEBOOK if filters and filters.get("content_type") == "rules" else None
+            
+            hyde_docs = self.rag_store.search(hypothetical, n_results=k, doc_type=doc_type)
+            
+            # Convert to SearchResult format
+            hyde_results = [
+                SearchResult(
+                    content=IndexedContent(
+                        content_id=doc.chunk_id,
+                        content_type=ContentType.RULE_DOCUMENT if doc.doc_type.value == "sourcebook" else ContentType.ADVENTURE_SCENE,
+                        text=doc.content,
+                        source=doc.source,
+                        title=doc.metadata.get("title", ""),
+                        metadata=doc.metadata,
+                    ),
+                    score=1.0,  # ChromaDB doesn't return scores in this format
+                    rank=i + 1,  # 1-indexed rank
+                )
+                for i, doc in enumerate(hyde_docs)
+            ]
+        else:
+            # Use RAGStore.retrieve_relevant_context()
+            hyde_results = self.rag_store.retrieve_relevant_context(
+                hypothetical,
+                k=k,
+                filters=filters,
+            )
+        
+        # Optionally also do direct search and merge
+        if fallback_to_direct and hypothetical != query:
+            if self._is_chroma_store:
+                direct_docs = self.rag_store.search(query, n_results=k // 2, doc_type=doc_type)
+                direct_results = [
+                    SearchResult(
+                        content=IndexedContent(
+                            content_id=doc.chunk_id,
+                            content_type=ContentType.RULE_DOCUMENT if doc.doc_type.value == "sourcebook" else ContentType.ADVENTURE_SCENE,
+                            text=doc.content,
+                            source=doc.source,
+                            title=doc.metadata.get("title", ""),
+                            metadata=doc.metadata,
+                        ),
+                        score=1.0,
+                        rank=i + 1,  # 1-indexed rank
+                    )
+                    for i, doc in enumerate(direct_docs)
+                ]
+            else:
+                direct_results = self.rag_store.retrieve_relevant_context(
+                    query,
+                    k=k // 2,  # Get fewer direct results
+                    filters=filters,
+                )
+            
+            # Merge and deduplicate by content_id
+            seen_ids = set()
+            merged = []
+            
+            # Prioritize HyDE results (better semantic match)
+            for result in hyde_results:
+                if result.content.content_id not in seen_ids:
+                    merged.append(result)
+                    seen_ids.add(result.content.content_id)
+            
+            # Add unique direct results
+            for result in direct_results:
+                if result.content.content_id not in seen_ids:
+                    merged.append(result)
+                    seen_ids.add(result.content.content_id)
+            
+            # Re-rank by score and limit to k
+            merged.sort(key=lambda r: r.score, reverse=True)
+            return merged[:k]
+        
+        return hyde_results
+
+
+def extract_enhanced_metadata(content: str, title: str) -> EnhancedMetadata:
+    """Extract enhanced metadata from content text.
+    
+    Uses pattern matching and heuristics to identify:
+    - Document subtype (spell, feat, class feature, etc.)
+    - Relevant classes
+    - Level requirements
+    - Prerequisites
+    
+    Args:
+        content: The text content.
+        title: The content title.
+        
+    Returns:
+        EnhancedMetadata with extracted information.
+    """
+    import re
+    
+    meta = EnhancedMetadata()
+    content_lower = content.lower()
+    title_lower = title.lower()
+    
+    # Detect document subtype
+    if any(word in title_lower for word in ["spell", "cantrip"]):
+        meta.doc_subtype = "spell"
+    elif any(word in title_lower for word in ["feat"]):
+        meta.doc_subtype = "feat"
+    elif any(word in content_lower for word in ["class feature", "class ability"]):
+        meta.doc_subtype = "class_feature"
+    elif any(word in title_lower for word in ["weapon", "armor", "item", "equipment"]):
+        meta.doc_subtype = "item"
+    else:
+        meta.doc_subtype = "general_rule"
+    
+    # Extract class associations
+    all_classes = [
+        "barbarian", "bard", "cleric", "druid", "fighter", "monk",
+        "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard"
+    ]
+    
+    for cls in all_classes:
+        # Look for class mentions in content or title
+        if cls in content_lower or cls in title_lower:
+            meta.classes.append(cls)
+    
+    # Extract level requirements
+    level_patterns = [
+        r"(\d+)(?:st|nd|rd|th)[\s-]level",
+        r"level (\d+)",
+        r"at (\d+)(?:st|nd|rd|th) level",
+        r"when you reach (\d+)(?:st|nd|rd|th) level",
+    ]
+    
+    for pattern in level_patterns:
+        match = re.search(pattern, content_lower)
+        if match:
+            level = int(match.group(1))
+            if meta.level_requirement is None or level < meta.level_requirement:
+                meta.level_requirement = level
+            break
+    
+    # Extract spell level for spells
+    if meta.doc_subtype == "spell":
+        spell_level_match = re.search(r"(\d)(?:st|nd|rd|th)?[\s-]level\s+(?:spell|conjuration|evocation|abjuration|divination|enchantment|illusion|necromancy|transmutation)", content_lower)
+        if spell_level_match:
+            spell_level = int(spell_level_match.group(1))
+            meta.level_requirement = spell_level
+        elif "cantrip" in content_lower or "cantrip" in title_lower:
+            meta.level_requirement = 0
+    
+    # Extract prerequisites
+    prereq_match = re.search(r"prerequisite[s]?:([^\n\.]+)", content_lower, re.IGNORECASE)
+    if prereq_match:
+        prereq_text = prereq_match.group(1).strip()
+        meta.prerequisites.append(prereq_text)
+    
+    # Add tags based on content
+    tag_keywords = {
+        "combat": ["attack", "damage", "hit points", "armor class", "weapon"],
+        "utility": ["skill", "tool", "proficiency"],
+        "social": ["persuasion", "deception", "intimidation", "performance"],
+        "exploration": ["perception", "investigation", "survival"],
+        "magic": ["spell", "cantrip", "magic", "arcane", "divine"],
+        "healing": ["heal", "restore", "hit points"],
+        "movement": ["speed", "fly", "swim", "climb", "jump"],
+    }
+    
+    for tag, keywords in tag_keywords.items():
+        if any(keyword in content_lower for keyword in keywords):
+            meta.tags.append(tag)
+    
+    return meta
 
 
 __all__ = [
     "ContentType",
+    "EnhancedMetadata",
     "IndexedContent",
     "SearchResult",
     "EmbeddingProvider",
     "BaseVectorStore",
     "FAISSVectorStore",
     "RAGStore",
+    "HyDERetriever",
+    "extract_enhanced_metadata",
 ]

@@ -59,6 +59,9 @@ def init_session_state() -> None:
     
     if "upload_success" not in st.session_state:
         st.session_state.upload_success = None
+    
+    if "indexing_in_progress" not in st.session_state:
+        st.session_state.indexing_in_progress = False
 
 
 def get_ingestor() -> UniversalIngestor:
@@ -156,14 +159,18 @@ def render_upload_section() -> None:
         help="Upload a D&D PDF to index for RAG retrieval",
     )
     
-    # Upload button
+    # Upload button (disabled while indexing)
     if uploaded_file:
-        if st.button("📥 Index Document", key="index_btn", use_container_width=True):
+        is_indexing = st.session_state.get("indexing_in_progress", False)
+        button_label = "⏳ Indexing..." if is_indexing else "📥 Index Document"
+        if st.button(button_label, key="index_btn", use_container_width=True, disabled=is_indexing):
             process_upload(uploaded_file, doc_type[1], custom_name)
 
 
 def process_upload(uploaded_file, doc_type: str, custom_name: str) -> None:
     """Process and index an uploaded document."""
+    from sqlite3 import IntegrityError
+    
     db = get_database()
     ingestor = get_ingestor()
     
@@ -176,6 +183,14 @@ def process_upload(uploaded_file, doc_type: str, custom_name: str) -> None:
     if existing:
         st.warning(f"This document is already indexed as **{existing.name}**")
         return
+    
+    # Prevent double-processing (race condition guard)
+    processing_key = f"processing_{file_hash}"
+    if st.session_state.get(processing_key) or st.session_state.get("indexing_in_progress"):
+        st.info("A document is already being processed...")
+        return
+    st.session_state[processing_key] = True
+    st.session_state.indexing_in_progress = True
     
     # Determine display name
     display_name = custom_name.strip() if custom_name.strip() else uploaded_file.name
@@ -190,27 +205,43 @@ def process_upload(uploaded_file, doc_type: str, custom_name: str) -> None:
             # Index based on document type
             if doc_type == "adventure":
                 chunk_count = ingestor.ingest_adventure_module(tmp_path, display_name)
+                triples_count = 0
             else:
-                chunk_count = ingestor.ingest_rulebook(tmp_path, display_name)
+                result = ingestor.ingest_rulebook(tmp_path, display_name)
+                chunk_count = result["chunks_added"]
+                triples_count = result.get("triples_added", 0)
             
             # Clean up temp file
             Path(tmp_path).unlink(missing_ok=True)
             
-            # Save to database
-            db.add_rulebook(
-                name=display_name,
-                filename=uploaded_file.name,
-                doc_type=doc_type,
-                chunk_count=chunk_count,
-                file_hash=file_hash,
-            )
+            # Save to database (handle race condition with IntegrityError)
+            try:
+                db.add_rulebook(
+                    name=display_name,
+                    filename=uploaded_file.name,
+                    doc_type=doc_type,
+                    chunk_count=chunk_count,
+                    file_hash=file_hash,
+                )
+            except IntegrityError:
+                # File was already indexed by another process - treat as success
+                logger.info(f"Document already indexed (race condition): {display_name}")
             
-            st.session_state.upload_success = f"Successfully indexed **{display_name}** ({chunk_count} chunks)"
+            # Build success message
+            success_msg = f"Successfully indexed **{display_name}** ({chunk_count} chunks"
+            if triples_count > 0:
+                success_msg += f", {triples_count} knowledge graph triples"
+            success_msg += ")"
+            st.session_state.upload_success = success_msg
             st.rerun()
             
         except Exception as e:
             logger.exception("Failed to index document")
             st.error(f"Failed to index document: {e}")
+        finally:
+            # Clear processing flags
+            st.session_state.pop(processing_key, None)
+            st.session_state.indexing_in_progress = False
 
 
 def render_library_section() -> None:

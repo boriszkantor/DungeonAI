@@ -32,6 +32,7 @@ from dnd_manager.ui.theme import (
     render_hp_bar,
     render_spell_slots,
 )
+import os
 
 logger = get_logger(__name__)
 
@@ -91,8 +92,28 @@ span[data-testid="stIconMaterial"] {
 # =============================================================================
 
 
+def init_settings_state() -> None:
+    """Initialize settings in session state from environment variables."""
+    if "settings" not in st.session_state:
+        # Use environment variable if set, otherwise use default model
+        # The Settings page will load the actual available models from OpenRouter API
+        st.session_state.settings = {
+            "api_provider": "openrouter",
+            "openrouter_api_key": os.environ.get("DND_MANAGER_OPENROUTER_API_KEY", ""),
+            "dm_model": os.environ.get("DND_MANAGER_DM_MODEL", "google/gemini-3-pro-preview"),
+            "vision_model": os.environ.get("DND_MANAGER_VISION_MODEL", "google/gemini-2.0-flash-001"),
+            "auto_save": True,
+            "show_dice_details": True,
+            "compact_combat": False,
+        }
+        logger.info("Initialized settings from env", dm_model=st.session_state.settings["dm_model"])
+
+
 def init_session_state() -> None:
     """Initialize all session state variables."""
+    
+    # Initialize settings first
+    init_settings_state()
     
     # Active session ID (from Sessions page)
     if "active_session_id" not in st.session_state:
@@ -175,6 +196,11 @@ def get_or_create_dm() -> DMOrchestrator:
         chroma_path = Path.home() / ".dungeonai" / "chroma"
         chroma_store = ChromaStore(persist_directory=str(chroma_path))
         
+        # Use ChromaStore for HyDE retrieval (already initialized above)
+        # HyDE will use the same ChromaDB backend as the main RAG system
+        rag_store = chroma_store
+        logger.info("Using ChromaStore for HyDE retrieval")
+        
         # Convert chat history to conversation format for the DM
         conversation_history = []
         for msg in st.session_state.chat_history:
@@ -188,23 +214,41 @@ def get_or_create_dm() -> DMOrchestrator:
                 conversation_history.append({"role": "assistant", "content": content})
             # Skip system and roll messages - they're UI-only
         
-        # Get model from settings (if available)
-        # Default to a model with good tool-calling support
-        dm_model = "google/gemini-2.5-flash-preview"
-        if "settings" in st.session_state and st.session_state.settings.get("dm_model"):
-            dm_model = st.session_state.settings["dm_model"]
+        # Get model from settings - guaranteed to exist because init_session_state calls init_settings_state
+        # This respects the user's choice from the Settings page dropdown
+        dm_model = st.session_state.settings.get("dm_model", "google/gemini-3-pro-preview")
         
-        # Log the model being used for debugging
-        logger.info(f"DM Model selected: {dm_model}")
+        # Log the model being used (visible in terminal/console)
+        print(f"\n{'='*60}")
+        print(f"🤖 CREATING DM ORCHESTRATOR")
+        print(f"{'='*60}")
+        print(f"Model: {dm_model}")
+        print(f"HyDE enabled: True")
+        print(f"Memory enabled: True")
+        print(f"{'='*60}\n")
+        
+        logger.info(f"Creating DM with user-selected model: {dm_model}")
+        logger.info(f"Settings state: {st.session_state.settings}")
         
         st.session_state.dm = DMOrchestrator(
             game_state=st.session_state.game_state,
             chroma_store=chroma_store,
             model=dm_model,
             conversation_history=conversation_history,
+            rag_store=rag_store,  # Enable HyDE and smart filtering
+            enable_hyde=True,
+            enable_memory=True,  # Enable SessionMemory
         )
         
         logger.info(f"Created DM with {len(conversation_history)} history messages, model: {dm_model}")
+        
+        # Log actually enabled features
+        features = []
+        if rag_store:
+            features.append("HyDE retrieval")
+            features.append("smart filtering")
+        features.append("session memory")
+        logger.info(f"Enhanced features enabled: {', '.join(features)}")
     return st.session_state.dm
 
 
@@ -974,6 +1018,22 @@ def render_sidebar() -> None:
     """Render the sidebar with character sheet and controls."""
     with st.sidebar:
         st.markdown("# 🐉 DungeonAI")
+        
+        # Show active model
+        if "settings" in st.session_state:
+            active_model = st.session_state.settings.get("dm_model", "Unknown")
+            # Extract just the model name for display (remove provider prefix)
+            model_display = active_model.split("/")[-1] if "/" in active_model else active_model
+            st.markdown(f"""
+            <div style="background: rgba(255, 255, 255, 0.05); 
+                        border-left: 3px solid #4A9EFF; 
+                        padding: 6px 10px; 
+                        margin-bottom: 12px; 
+                        border-radius: 4px; 
+                        font-size: 0.85em;">
+                🤖 Model: <code>{model_display}</code>
+            </div>
+            """, unsafe_allow_html=True)
         
         character = get_active_character()
         

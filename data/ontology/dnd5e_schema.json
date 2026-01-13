@@ -1,0 +1,365 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "D&D 5E Knowledge Graph Ontology",
+  "description": "Formal ontology defining entity types and valid predicates for the D&D 5E knowledge graph",
+  "version": "1.0.0",
+  
+  "entity_types": {
+    "Spell": {
+      "description": "Any spell or cantrip from the game",
+      "examples": ["Fireball", "Shield", "Mage Hand", "Healing Word"],
+      "attributes": ["level", "school", "casting_time", "range", "components", "duration"]
+    },
+    "ClassFeature": {
+      "description": "Class-granted abilities and features",
+      "examples": ["Evasion", "Sneak Attack", "Action Surge", "Wild Shape", "Rage"],
+      "attributes": ["class", "level_requirement", "uses_per_rest"]
+    },
+    "Condition": {
+      "description": "Status effects that can be applied to creatures",
+      "examples": ["Blinded", "Charmed", "Frightened", "Paralyzed", "Prone", "Stunned"],
+      "attributes": ["effects"]
+    },
+    "DamageType": {
+      "description": "Categories of damage in the game",
+      "examples": ["Fire", "Cold", "Lightning", "Radiant", "Necrotic", "Bludgeoning", "Slashing", "Piercing"],
+      "attributes": []
+    },
+    "Save": {
+      "description": "The six saving throw types",
+      "examples": ["STR", "DEX", "CON", "INT", "WIS", "CHA"],
+      "attributes": ["ability"]
+    },
+    "Race": {
+      "description": "Playable character races",
+      "examples": ["Elf", "Dwarf", "Human", "Tiefling", "Dragonborn", "Half-Orc"],
+      "attributes": ["size", "speed", "subraces"]
+    },
+    "Class": {
+      "description": "Character classes",
+      "examples": ["Fighter", "Wizard", "Monk", "Rogue", "Cleric", "Paladin"],
+      "attributes": ["hit_die", "primary_ability", "saving_throw_proficiencies"]
+    },
+    "Subclass": {
+      "description": "Class specializations/archetypes",
+      "examples": ["Champion", "Evocation", "Way of the Open Hand", "Assassin"],
+      "attributes": ["parent_class", "level_gained"]
+    },
+    "Feat": {
+      "description": "Optional character feats",
+      "examples": ["Lucky", "Sentinel", "Shield Master", "Great Weapon Master", "Sharpshooter"],
+      "attributes": ["prerequisites"]
+    },
+    "Item": {
+      "description": "Equipment and magic items",
+      "examples": ["Longsword", "Ring of Protection", "Bag of Holding", "Plate Armor"],
+      "attributes": ["type", "rarity", "attunement_required"]
+    },
+    "Action": {
+      "description": "Action economy types",
+      "examples": ["Action", "BonusAction", "Reaction", "Movement", "FreeAction"],
+      "attributes": []
+    },
+    "Monster": {
+      "description": "Creature stat blocks",
+      "examples": ["Goblin", "Adult Red Dragon", "Beholder", "Zombie"],
+      "attributes": ["cr", "type", "size", "alignment"]
+    },
+    "Mechanic": {
+      "description": "Core game rules and mechanics",
+      "examples": ["Opportunity Attack", "Concentration", "Advantage", "Cover", "Grapple"],
+      "attributes": ["rule_source"]
+    },
+    "Skill": {
+      "description": "Character skills",
+      "examples": ["Stealth", "Perception", "Athletics", "Arcana", "Persuasion"],
+      "attributes": ["ability"]
+    },
+    "AbilityScore": {
+      "description": "The six ability scores",
+      "examples": ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"],
+      "attributes": []
+    },
+    "SpellSchool": {
+      "description": "Schools of magic",
+      "examples": ["Evocation", "Abjuration", "Conjuration", "Necromancy", "Illusion"],
+      "attributes": []
+    },
+    "CreatureType": {
+      "description": "Categories of creatures",
+      "examples": ["Humanoid", "Undead", "Fiend", "Dragon", "Aberration", "Construct"],
+      "attributes": []
+    },
+    "Range": {
+      "description": "Distance measurements",
+      "examples": ["Self", "Touch", "30 feet", "60 feet", "120 feet", "Unlimited"],
+      "attributes": ["distance_feet"]
+    },
+    "SpellLevel": {
+      "description": "Spell level (0 for cantrips, 1-9 for leveled spells)",
+      "examples": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+      "attributes": []
+    }
+  },
+
+  "predicates": {
+    "requires_save": {
+      "description": "Indicates that a spell or effect requires a saving throw",
+      "valid_sources": ["Spell", "ClassFeature", "Monster", "Item"],
+      "valid_targets": ["Save"],
+      "cardinality": "many-to-one",
+      "examples": [
+        {"subject": "Fireball", "object": "DEX"},
+        {"subject": "Hold Person", "object": "WIS"}
+      ]
+    },
+    "deals_damage": {
+      "description": "Indicates that something deals a specific damage type",
+      "valid_sources": ["Spell", "ClassFeature", "Monster", "Item"],
+      "valid_targets": ["DamageType"],
+      "cardinality": "many-to-many",
+      "examples": [
+        {"subject": "Fireball", "object": "Fire"},
+        {"subject": "Sneak Attack", "object": "Piercing"}
+      ]
+    },
+    "inflicts_condition": {
+      "description": "Indicates that something can apply a condition",
+      "valid_sources": ["Spell", "ClassFeature", "Monster", "Item"],
+      "valid_targets": ["Condition"],
+      "cardinality": "many-to-many",
+      "examples": [
+        {"subject": "Hold Person", "object": "Paralyzed"},
+        {"subject": "Stunning Strike", "object": "Stunned"}
+      ]
+    },
+    "overrules": {
+      "description": "Indicates that a specific rule overrides a general mechanic (specific beats general)",
+      "valid_sources": ["ClassFeature", "Feat", "Race"],
+      "valid_targets": ["Mechanic", "Save"],
+      "cardinality": "many-to-many",
+      "metadata": ["condition"],
+      "examples": [
+        {"subject": "Evasion", "object": "DEX", "condition": "On successful save, take no damage instead of half"},
+        {"subject": "Shield Master", "object": "DEX", "condition": "Add shield AC bonus to save"}
+      ]
+    },
+    "immune_to": {
+      "description": "Indicates immunity to a damage type or condition",
+      "valid_sources": ["Race", "Class", "ClassFeature", "Monster", "CreatureType", "Item"],
+      "valid_targets": ["DamageType", "Condition"],
+      "cardinality": "many-to-many",
+      "examples": [
+        {"subject": "Elf", "object": "Charmed", "condition": "Magical sleep only"},
+        {"subject": "Construct", "object": "Poisoned"}
+      ]
+    },
+    "resistant_to": {
+      "description": "Indicates resistance to a damage type (half damage)",
+      "valid_sources": ["Race", "Class", "ClassFeature", "Monster", "Item"],
+      "valid_targets": ["DamageType"],
+      "cardinality": "many-to-many",
+      "examples": [
+        {"subject": "Tiefling", "object": "Fire"},
+        {"subject": "Bear Totem", "object": "Bludgeoning"}
+      ]
+    },
+    "vulnerable_to": {
+      "description": "Indicates vulnerability to a damage type (double damage)",
+      "valid_sources": ["Race", "Monster", "CreatureType"],
+      "valid_targets": ["DamageType"],
+      "cardinality": "many-to-many",
+      "examples": [
+        {"subject": "Zombie", "object": "Radiant"}
+      ]
+    },
+    "prerequisite_of": {
+      "description": "Indicates a requirement for taking a feat or feature",
+      "valid_sources": ["Race", "Class", "AbilityScore", "Feat", "ClassFeature"],
+      "valid_targets": ["Feat", "ClassFeature", "Subclass"],
+      "cardinality": "many-to-many",
+      "metadata": ["minimum_value"],
+      "examples": [
+        {"subject": "Elf", "object": "Elven Accuracy"},
+        {"subject": "Dexterity", "object": "Defensive Duelist", "minimum_value": 13}
+      ]
+    },
+    "grants_feature": {
+      "description": "Indicates that a class/race grants a feature at a certain level",
+      "valid_sources": ["Class", "Subclass", "Race"],
+      "valid_targets": ["ClassFeature"],
+      "cardinality": "many-to-many",
+      "metadata": ["level_requirement"],
+      "examples": [
+        {"subject": "Monk", "object": "Evasion", "level_requirement": 7},
+        {"subject": "Rogue", "object": "Evasion", "level_requirement": 7}
+      ]
+    },
+    "costs_action": {
+      "description": "Indicates the action economy cost of an ability",
+      "valid_sources": ["Spell", "ClassFeature", "Item"],
+      "valid_targets": ["Action"],
+      "cardinality": "many-to-one",
+      "examples": [
+        {"subject": "Fireball", "object": "Action"},
+        {"subject": "Misty Step", "object": "BonusAction"},
+        {"subject": "Shield", "object": "Reaction"}
+      ]
+    },
+    "grants_extra_action": {
+      "description": "Indicates that something grants additional actions",
+      "valid_sources": ["ClassFeature", "Spell", "Item"],
+      "valid_targets": ["Action"],
+      "cardinality": "many-to-many",
+      "metadata": ["uses_per_rest"],
+      "examples": [
+        {"subject": "Action Surge", "object": "Action", "uses_per_rest": "short"},
+        {"subject": "Haste", "object": "Action"}
+      ]
+    },
+    "triggers_reaction": {
+      "description": "Indicates that something can trigger a reaction",
+      "valid_sources": ["Mechanic", "Spell", "ClassFeature"],
+      "valid_targets": ["ClassFeature", "Spell"],
+      "cardinality": "many-to-many",
+      "examples": [
+        {"subject": "Opportunity Attack", "object": "Attack of Opportunity"},
+        {"subject": "Taking Damage", "object": "Hellish Rebuke"}
+      ]
+    },
+    "requires_concentration": {
+      "description": "Indicates that a spell requires concentration",
+      "valid_sources": ["Spell"],
+      "valid_targets": ["Mechanic"],
+      "cardinality": "many-to-one",
+      "examples": [
+        {"subject": "Haste", "object": "Concentration"},
+        {"subject": "Hold Person", "object": "Concentration"}
+      ]
+    },
+    "has_range": {
+      "description": "Indicates the range of a spell or ability",
+      "valid_sources": ["Spell", "ClassFeature", "Item"],
+      "valid_targets": ["Range"],
+      "cardinality": "many-to-one",
+      "examples": [
+        {"subject": "Fireball", "object": "150 feet"},
+        {"subject": "Cure Wounds", "object": "Touch"}
+      ]
+    },
+    "has_spell_school": {
+      "description": "Indicates the school of magic for a spell",
+      "valid_sources": ["Spell"],
+      "valid_targets": ["SpellSchool"],
+      "cardinality": "many-to-one",
+      "examples": [
+        {"subject": "Fireball", "object": "Evocation"},
+        {"subject": "Shield", "object": "Abjuration"}
+      ]
+    },
+    "has_spell_level": {
+      "description": "Indicates the level of a spell (0 for cantrips)",
+      "valid_sources": ["Spell"],
+      "valid_targets": ["SpellLevel"],
+      "cardinality": "many-to-one",
+      "examples": [
+        {"subject": "Fireball", "object": "3"},
+        {"subject": "Fire Bolt", "object": "0"}
+      ]
+    },
+    "can_cast": {
+      "description": "Indicates that a class can cast a spell (at some level)",
+      "valid_sources": ["Class", "Subclass", "Race"],
+      "valid_targets": ["Spell"],
+      "cardinality": "many-to-many",
+      "metadata": ["level_requirement"],
+      "examples": [
+        {"subject": "Wizard", "object": "Fireball", "level_requirement": 5},
+        {"subject": "Tiefling", "object": "Hellish Rebuke", "level_requirement": 3}
+      ]
+    },
+    "uses_ability": {
+      "description": "Indicates which ability score a skill or save uses",
+      "valid_sources": ["Skill", "Save"],
+      "valid_targets": ["AbilityScore"],
+      "cardinality": "many-to-one",
+      "examples": [
+        {"subject": "Stealth", "object": "Dexterity"},
+        {"subject": "DEX", "object": "Dexterity"}
+      ]
+    },
+    "has_creature_type": {
+      "description": "Indicates the creature type of a monster or race",
+      "valid_sources": ["Monster", "Race"],
+      "valid_targets": ["CreatureType"],
+      "cardinality": "many-to-one",
+      "examples": [
+        {"subject": "Goblin", "object": "Humanoid"},
+        {"subject": "Zombie", "object": "Undead"}
+      ]
+    },
+    "advantage_on": {
+      "description": "Indicates that something grants advantage on a check or attack",
+      "valid_sources": ["ClassFeature", "Feat", "Spell", "Condition", "Race"],
+      "valid_targets": ["Skill", "Save", "Mechanic"],
+      "cardinality": "many-to-many",
+      "examples": [
+        {"subject": "Reckless Attack", "object": "Attack"},
+        {"subject": "Prone", "object": "Attack", "condition": "Attacker within 5 feet"}
+      ]
+    },
+    "disadvantage_on": {
+      "description": "Indicates that something imposes disadvantage",
+      "valid_sources": ["ClassFeature", "Feat", "Spell", "Condition", "Item"],
+      "valid_targets": ["Skill", "Save", "Mechanic"],
+      "cardinality": "many-to-many",
+      "examples": [
+        {"subject": "Prone", "object": "Attack", "condition": "Attacker beyond 5 feet"},
+        {"subject": "Blinded", "object": "Attack"}
+      ]
+    },
+    "part_of": {
+      "description": "Indicates that something is part of a larger category",
+      "valid_sources": ["Subclass", "ClassFeature", "Spell"],
+      "valid_targets": ["Class", "SpellSchool"],
+      "cardinality": "many-to-one",
+      "examples": [
+        {"subject": "Champion", "object": "Fighter"},
+        {"subject": "Fireball", "object": "Evocation"}
+      ]
+    },
+    "counters": {
+      "description": "Indicates that something can counter or dispel another effect",
+      "valid_sources": ["Spell", "ClassFeature", "Item"],
+      "valid_targets": ["Spell", "Condition", "Mechanic"],
+      "cardinality": "many-to-many",
+      "examples": [
+        {"subject": "Counterspell", "object": "Spell"},
+        {"subject": "Lesser Restoration", "object": "Poisoned"}
+      ]
+    },
+    "ends_on": {
+      "description": "Indicates when an effect ends",
+      "valid_sources": ["Condition", "Spell"],
+      "valid_targets": ["Mechanic"],
+      "cardinality": "many-to-many",
+      "examples": [
+        {"subject": "Prone", "object": "Stand Up"},
+        {"subject": "Grappled", "object": "Escape Action"}
+      ]
+    }
+  },
+
+  "validation_rules": {
+    "triple_constraints": [
+      "Subject type must be in valid_sources for the predicate",
+      "Object type must be in valid_targets for the predicate",
+      "Metadata fields are optional but must match schema if provided"
+    ],
+    "entity_constraints": [
+      "Entity names should be in title case",
+      "Canonical names should not include articles (the, a, an)",
+      "Abbreviations should be uppercase (DEX, STR, CON)"
+    ]
+  }
+}

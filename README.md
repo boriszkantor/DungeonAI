@@ -1,105 +1,251 @@
-# D&D 5E AI Campaign Manager
+<div align="center">
 
-A production-grade, AI-powered campaign management system for Dungeons & Dragons 5th Edition, built with a modular monolith architecture.
+# 🐉 DungeonAI
 
-## Features
+### AI-Powered D&D 5th Edition Campaign Manager
 
-### Core Gameplay
-- 🎲 **Advanced Dice Rolling** - Full D&D 5E mechanics with advantage, disadvantage, and 3 critical hit variants
-- ⚔️ **Combat Tracker** - Initiative tracking with actual DEX modifiers, turn management, and action economy
-- 📖 **Campaign Management** - Scenes, sessions, and campaign state persistence with SQLite
-- 👥 **Character Management** - Complete character creation with intelligent Standard Array and Half-Elf ability choices
-- 📄 **PDF Export** - Export character sheets to fillable PDF documents
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[![Typed: mypy](https://img.shields.io/badge/typed-mypy-blue.svg)](https://mypy-lang.org/)
 
-### AI & Automation
-- 🤖 **AI Integration** - Gemini and OpenAI support for DM assistance
-- 📚 **RAG Pipeline** - PDF ingestion and semantic search for rulebooks with ChromaDB
-- 🔮 **Vision AI** - Automatic character sheet extraction from uploaded PDFs
+*A production-grade campaign management system combining RAG retrieval, knowledge graphs, and vision AI to deliver an intelligent digital Dungeon Master assistant.*
 
-### D&D 5E Accuracy
-- ✨ **Warlock Pact Magic** - Proper pact slot handling with short rest recovery
-- 🎯 **Ability Score Caps** - Automatic validation (20 for PCs, 24 for level 20 Barbarians)
-- 🎲 **Critical Hit Options** - Choose between double dice, double damage, or max+roll
-- 🧝 **Racial Features** - Full support including Half-Elf ability score choices
+[Features](#-features) •
+[Quick Start](#-quick-start) •
+[Installation](#-installation) •
+[Documentation](#-documentation) •
+[Contributing](#-contributing)
 
-### User Experience
-- 🖥️ **Modern UI** - Streamlit interface with custom D&D theme
-- 🎨 **Dice Animations** - Visual feedback for rolls with special effects for nat 20s/nat 1s
-- 💬 **Chat Pagination** - Smooth performance with long conversation histories
-- 📱 **Responsive Design** - Works on desktop and mobile devices
+</div>
 
-## Architecture
+---
 
-This project follows a **Modular Monolith** pattern with strict domain separation:
+## ✨ Features
 
-```
-src/dnd_manager/
-├── core/           # Configuration, logging, base exceptions
-├── models/         # Pydantic V2 schemas for game entities
-├── ingestion/      # PDF parsing, OCR, RAG pipeline
-├── engine/         # Game loop, turn management, dice logic
-└── ui/             # Streamlit interface
-```
+### 🧠 Hybrid RAG + Knowledge Graph System
 
-## Requirements
+DungeonAI uses a **state-of-the-art hybrid retrieval system** that combines semantic search with structured knowledge graphs:
 
-- Python 3.11+
-- Dependencies managed via `pyproject.toml`
+- **📚 PDF Ingestion** — Import your rulebooks (PHB, DMG, etc.) with automatic markdown conversion and semantic chunking
+- **🔍 Vector Search** — ChromaDB-powered semantic search finds relevant rules and descriptions
+- **🕸️ Knowledge Graph** — NetworkX graph captures entity relationships (spells → conditions, classes → features)
+- **⚡ Hybrid Queries** — Combines vector similarity with graph traversal for "specific beats general" rule resolution
 
-## Installation
+### 🤖 AI-Powered Dungeon Master
 
-### Development Setup
+- **Vision AI Character Import** — Upload a character sheet PDF and watch AI extract all stats, features, and equipment
+- **Contextual Rule Lookup** — AI responses cite specific rulebook passages with page references
+- **Multi-hop Reasoning** — Knowledge graph enables complex queries like *"What affects a Monk's Evasion against Fireball?"*
 
-1. Clone the repository:
+### 🎮 Complete Game Management
+
+| Feature | Description |
+|---------|-------------|
+| **Character Builder** | Full 5E character creation with intelligent Standard Array, racial features, and class abilities |
+| **Combat Tracker** | Initiative with DEX tiebreakers, turn management, and action economy tracking |
+| **Dice Engine** | Advanced roller supporting advantage, disadvantage, and 3 critical hit variants |
+| **Campaign Persistence** | SQLite-backed sessions, scenes, and campaign state that persists across sessions |
+| **PDF Export** | Generate fillable character sheet PDFs from your characters |
+
+### 🎯 D&D 5E Rules Accuracy
+
+- ✅ Warlock Pact Magic with proper short rest recovery
+- ✅ Ability score caps (20 standard, 24 for level 20 Barbarians)
+- ✅ Half-Elf flexible ability score choices
+- ✅ Spell slot tracking per class with multiclass support
+- ✅ Condition tracking with automatic effect application
+
+---
+
+## 🚀 Quick Start
+
 ```bash
-git clone https://github.com/your-org/dnd-manager.git
-cd dnd-manager
-```
+# Clone the repository
+git clone https://github.com/yourusername/dnd-campaign-manager.git
+cd dnd-campaign-manager
 
-2. Create and activate a virtual environment:
-```bash
+# Create virtual environment
 python -m venv venv
-# Windows
-.\venv\Scripts\activate
-# Unix/macOS
-source venv/bin/activate
-```
+source venv/bin/activate  # Windows: .\venv\Scripts\activate
 
-3. Install dependencies:
-```bash
-pip install -e ".[dev]"
-```
+# Install dependencies
+pip install -e .
 
-4. Copy the environment template and configure:
-```bash
-cp .env.example .env
-# Edit .env with your API keys
-```
+# Set up your API key (OpenRouter for AI features)
+echo "OPENROUTER_API_KEY=your-key-here" > .env
 
-### Running the Application
-
-```bash
+# Launch the application
 streamlit run src/dnd_manager/ui/app.py
 ```
 
-Or using the installed entry point:
+The app will open at `http://localhost:8501`
+
+---
+
+## 📦 Installation
+
+### Prerequisites
+
+- **Python 3.11+** — [Download Python](https://www.python.org/downloads/)
+- **Poppler** — Required for PDF processing
+  - **Windows**: Included in `poppler-25.12.0/` directory, or install via [Chocolatey](https://chocolatey.org/): `choco install poppler`
+  - **macOS**: `brew install poppler`
+  - **Linux**: `sudo apt-get install poppler-utils`
+
+### Standard Installation
+
 ```bash
-dnd-manager
+# Clone and enter the project
+git clone https://github.com/yourusername/dnd-campaign-manager.git
+cd dnd-campaign-manager
+
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # Windows: .\venv\Scripts\activate
+
+# Install the package
+pip install -e .
 ```
 
-## Configuration
+### Development Installation
 
-Configuration is managed through environment variables or a `.env` file:
+```bash
+# Install with development dependencies
+pip install -e ".[dev]"
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DND_MANAGER_GEMINI_API_KEY` | Google Gemini API key | Required if using Gemini |
-| `DND_MANAGER_OPENAI_API_KEY` | OpenAI API key | Required if using OpenAI |
-| `DND_MANAGER_DEFAULT_PROVIDER` | Default AI provider | `gemini` |
-| `DND_MANAGER_LOG_LEVEL` | Logging level | `INFO` |
-| `DND_MANAGER_DEBUG` | Enable debug mode | `false` |
+# Install pre-commit hooks
+pre-commit install
+```
 
-## Development
+### Configuration
+
+Create a `.env` file in the project root:
+
+```env
+# Required for AI features (get a key at https://openrouter.ai)
+OPENROUTER_API_KEY=sk-or-v1-your-key-here
+
+# Optional: Override default models
+OPENROUTER_VISION_MODEL=google/gemini-2.0-flash-001
+OPENROUTER_REASONING_MODEL=google/gemini-2.0-flash-001
+
+# Optional: Logging
+DND_MANAGER_LOG_LEVEL=INFO
+DND_MANAGER_DEBUG=false
+```
+
+---
+
+## 🏗️ Architecture
+
+DungeonAI follows a **Modular Monolith** architecture with strict domain separation:
+
+```
+src/dnd_manager/
+├── core/                   # Foundation layer
+│   ├── config.py           # Pydantic settings management
+│   ├── constants.py        # Game constants (abilities, skills, etc.)
+│   ├── exceptions.py       # Unified exception hierarchy
+│   └── logging.py          # Structured logging with structlog
+│
+├── models/                 # Domain models (Pydantic V2)
+│   ├── character.py        # Character, AbilityScores, Features
+│   ├── combat.py           # CombatState, Initiative, Actions
+│   ├── campaign.py         # Campaign, Session, Scene
+│   └── entities.py         # Base entity types
+│
+├── ingestion/              # Document processing & RAG
+│   ├── universal_loader.py # Unified ingestion pipeline
+│   ├── pdf_parser.py       # PDF → Markdown conversion
+│   ├── rag_store.py        # ChromaDB vector store
+│   ├── knowledge_graph.py  # NetworkX graph operations
+│   ├── triple_extractor.py # LLM-based relationship extraction
+│   ├── entity_resolver.py  # Fuzzy entity matching
+│   └── hybrid_retriever.py # Combined vector + graph search
+│
+├── engine/                 # Game logic
+│   ├── dice.py             # Dice rolling & expressions
+│   ├── turn_manager.py     # Combat turn sequencing
+│   └── game_loop.py        # Session state machine
+│
+├── storage/                # Persistence
+│   └── database.py         # SQLite operations
+│
+└── ui/                     # Streamlit interface
+    ├── app.py              # Main application entry
+    ├── theme.py            # D&D-themed styling
+    ├── components/         # Reusable UI components
+    └── pages/              # Application pages
+        ├── 1_Library.py    # Rulebook management
+        ├── 2_Characters.py # Character management
+        ├── 3_Campaign.py   # Campaign management
+        └── 4_Play.py       # Active gameplay
+```
+
+### Data Flow
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
+│   PDF       │────▶│   Markdown   │────▶│   Chunks        │
+│   Rulebook  │     │   Converter  │     │   (by headers)  │
+└─────────────┘     └──────────────┘     └────────┬────────┘
+                                                  │
+                         ┌────────────────────────┴────────────────────────┐
+                         ▼                                                 ▼
+              ┌─────────────────────┐                          ┌─────────────────────┐
+              │   ChromaDB          │                          │   Triple Extractor  │
+              │   (Vector Store)    │                          │   (LLM Pipeline)    │
+              └──────────┬──────────┘                          └──────────┬──────────┘
+                         │                                                 │
+                         ▼                                                 ▼
+              ┌─────────────────────┐                          ┌─────────────────────┐
+              │   Semantic Search   │◀────── Hybrid Query ─────▶│   Knowledge Graph   │
+              │   (Top-K retrieval) │                          │   (Graph traversal) │
+              └─────────────────────┘                          └─────────────────────┘
+```
+
+---
+
+## 📖 Documentation
+
+### Importing Rulebooks
+
+1. Navigate to **📚 Library** in the sidebar
+2. Upload your D&D PDF (PHB, DMG, Monster Manual, etc.)
+3. Select the document type and click **Index Document**
+4. The system will:
+   - Convert PDF to semantic markdown
+   - Chunk content by section headers
+   - Generate embeddings and store in ChromaDB
+   - Extract entity relationships into the knowledge graph
+
+### Character Creation
+
+1. Navigate to **👤 Characters**
+2. Choose **Create New** or **Import from PDF**
+3. For PDF import: Upload a character sheet and AI will extract all data
+4. For manual creation: Follow the guided wizard through:
+   - Race selection (with ability score choices)
+   - Class selection (with subclass at appropriate level)
+   - Background selection
+   - Ability score assignment (Standard Array or Point Buy)
+   - Equipment and spell selection
+
+### Running a Session
+
+1. Navigate to **🎮 Play**
+2. Select or create a campaign
+3. Add characters to the session
+4. Use the AI DM assistant to:
+   - Look up rules with `@rules [query]`
+   - Roll dice with standard notation (e.g., `2d6+3`)
+   - Track combat with the initiative tracker
+   - Manage conditions and effects
+
+---
+
+## 🧪 Development
 
 ### Running Tests
 
@@ -107,14 +253,13 @@ Configuration is managed through environment variables or a `.env` file:
 # Run all tests
 pytest
 
-# Run with coverage
+# Run with coverage report
 pytest --cov=src/dnd_manager --cov-report=html
 
-# Run specific test file
-pytest tests/unit/engine/test_dice.py
-
-# Run tests matching a pattern
-pytest -k "test_roll"
+# Run specific test categories
+pytest -m unit          # Unit tests only
+pytest -m integration   # Integration tests only
+pytest -m "not slow"    # Skip slow tests
 ```
 
 ### Code Quality
@@ -128,88 +273,68 @@ ruff check src tests
 
 # Type checking
 mypy src
-```
 
-### Pre-commit Hooks
-
-```bash
-pre-commit install
+# Run all checks (pre-commit)
 pre-commit run --all-files
 ```
 
-## Project Structure
+### Project Standards
 
-```
-D&D Campaign Manager/
-├── src/
-│   └── dnd_manager/
-│       ├── __init__.py
-│       ├── core/
-│       │   ├── __init__.py
-│       │   ├── config.py          # Pydantic settings
-│       │   ├── exceptions.py      # Exception hierarchy
-│       │   └── logging.py         # Structured logging
-│       ├── models/
-│       │   ├── __init__.py
-│       │   ├── character.py       # Character schemas
-│       │   ├── combat.py          # Combat schemas
-│       │   └── campaign.py        # Campaign schemas
-│       ├── ingestion/
-│       │   ├── __init__.py
-│       │   ├── pdf_parser.py      # PDF extraction
-│       │   ├── ocr.py             # Image OCR
-│       │   └── rag_pipeline.py    # Vector store & retrieval
-│       ├── engine/
-│       │   ├── __init__.py
-│       │   ├── dice.py            # Dice rolling
-│       │   ├── turn_manager.py    # Combat turns
-│       │   └── game_loop.py       # Game state machine
-│       └── ui/
-│           ├── __init__.py
-│           ├── app.py             # Main Streamlit app
-│           └── components.py      # UI components
-├── tests/
-│   ├── conftest.py
-│   ├── unit/
-│   └── integration/
-├── docs/
-├── data/
-│   ├── scenes/
-│   ├── assets/
-│   └── cache/
-├── pyproject.toml
-├── README.md
-└── .env.example
-```
+- **Type Hints**: Full type coverage with `mypy --strict`
+- **Documentation**: Google-style docstrings
+- **Testing**: 80%+ code coverage requirement
+- **Formatting**: Enforced via `ruff format`
+- **Linting**: Comprehensive rules via `ruff check`
 
-## Exception Handling
+---
 
-All exceptions inherit from `DndManagerError` for unified error handling:
+## 🤝 Contributing
 
-```python
-from dnd_manager.core.exceptions import DiceRollError
+We welcome contributions! Please follow these steps:
 
-try:
-    result = roll("invalid")
-except DiceRollError as e:
-    print(f"Error: {e.message}")
-    print(f"Details: {e.details}")
-```
+1. **Fork** the repository
+2. **Create** a feature branch: `git checkout -b feature/amazing-feature`
+3. **Make** your changes with appropriate tests
+4. **Ensure** all checks pass:
+   ```bash
+   ruff format src tests
+   ruff check src tests
+   mypy src
+   pytest
+   ```
+5. **Commit** with a descriptive message: `git commit -m 'Add amazing feature'`
+6. **Push** to your branch: `git push origin feature/amazing-feature`
+7. **Open** a Pull Request
 
-## License
+### Code Style
 
-MIT License - see LICENSE file for details.
+- Follow existing patterns in the codebase
+- Add type hints to all functions
+- Write docstrings for public APIs
+- Include tests for new functionality
 
-## Contributing
+---
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## 📄 License
 
-Please ensure:
-- All tests pass
-- Code is formatted with `ruff format`
-- No linting errors with `ruff check`
-- Type hints are complete and pass `mypy --strict`
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- **Wizards of the Coast** for Dungeons & Dragons
+- **OpenRouter** for unified LLM API access
+- **ChromaDB** for vector storage
+- **Streamlit** for the web framework
+
+---
+
+<div align="center">
+
+**Built with ❤️ for the D&D community**
+
+[Report Bug](https://github.com/yourusername/dnd-campaign-manager/issues) •
+[Request Feature](https://github.com/yourusername/dnd-campaign-manager/issues)
+
+</div>

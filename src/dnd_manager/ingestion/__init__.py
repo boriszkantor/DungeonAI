@@ -5,12 +5,17 @@ This module provides comprehensive document ingestion capabilities including:
 - Rule book parsing and semantic chunking for RAG
 - Adventure module scene extraction
 - Vector store indexing and retrieval
+- Knowledge graph construction for hybrid graph-vector RAG
 
 Submodules:
     vision_parser: Extract character data from character sheet images/PDFs
     rules_loader: Parse and chunk D&D rule books for knowledge base
     module_loader: Extract scenes from adventure modules
     rag_store: Vector store for indexing and semantic search
+    ontology: D&D 5E ontology schema and triple validation
+    entity_resolver: Canonicalization of entity names
+    knowledge_graph: NetworkX-based knowledge graph for rule relationships
+    hybrid_retriever: Combined graph-vector search
 
 Example:
     >>> from dnd_manager.ingestion import (
@@ -18,21 +23,21 @@ Example:
     ...     ingest_rule_book,
     ...     ingest_adventure_module,
     ...     RAGStore,
+    ...     HybridRetriever,
+    ...     DnDKnowledgeGraph,
     ... )
     >>>
     >>> # Extract character from sheet
     >>> with open("character.pdf", "rb") as f:
     ...     character = extract_character_from_pdf(f.read())
     >>>
-    >>> # Build knowledge base
-    >>> documents = ingest_rule_book("phb.pdf", source_name="Player's Handbook")
-    >>> scenes = ingest_adventure_module("adventure.pdf")
-    >>>
-    >>> # Index and search
-    >>> store = RAGStore()
-    >>> store.index_documents(documents)
-    >>> store.index_scenes(scenes)
-    >>> results = store.retrieve_relevant_context("fireball spell")
+    >>> # Build knowledge base with graph
+    >>> ingestor = UniversalIngestor(enable_knowledge_graph=True)
+    >>> ingestor.ingest_rulebook("phb.pdf")
+    >>> 
+    >>> # Hybrid search finds related rules (e.g., Evasion for Fireball + Monk)
+    >>> result = ingestor.hybrid_search("Monk hit by Fireball", character=monk)
+    >>> print(result.graph_context)
 """
 
 from __future__ import annotations
@@ -87,6 +92,41 @@ from dnd_manager.ingestion.rag_store import (
 )
 
 # =============================================================================
+# Knowledge Graph & Hybrid RAG
+# =============================================================================
+from dnd_manager.ingestion.ontology import (
+    EntityType,
+    OntologySchema,
+    Predicate,
+    PredicateConstraint,
+    SemanticTriple,
+    ValidationResult,
+)
+from dnd_manager.ingestion.entity_resolver import (
+    CanonicalEntity,
+    EntityResolver,
+    ResolutionResult,
+)
+from dnd_manager.ingestion.knowledge_graph import (
+    DnDKnowledgeGraph,
+    GraphEdge,
+    GraphNode,
+    TraversalResult,
+)
+from dnd_manager.ingestion.hybrid_retriever import (
+    HybridRetriever,
+    HybridSearchResult,
+    RelatedRule,
+    create_hybrid_retriever,
+)
+from dnd_manager.ingestion.triple_extractor import (
+    ExtractionResult,
+    ExtractionStats,
+    TripleExtractor,
+    extract_triples_from_chunks,
+)
+
+# =============================================================================
 # Legacy Exports (for backwards compatibility)
 # =============================================================================
 from dnd_manager.ingestion.pdf_parser import (
@@ -131,6 +171,32 @@ __all__ = [
     "BaseVectorStore",
     "FAISSVectorStore",
     "RAGStore",
+    # Ontology
+    "EntityType",
+    "Predicate",
+    "PredicateConstraint",
+    "SemanticTriple",
+    "ValidationResult",
+    "OntologySchema",
+    # Entity Resolution
+    "CanonicalEntity",
+    "ResolutionResult",
+    "EntityResolver",
+    # Knowledge Graph
+    "GraphNode",
+    "GraphEdge",
+    "TraversalResult",
+    "DnDKnowledgeGraph",
+    # Triple Extraction
+    "ExtractionResult",
+    "ExtractionStats",
+    "TripleExtractor",
+    "extract_triples_from_chunks",
+    # Hybrid Retriever
+    "RelatedRule",
+    "HybridSearchResult",
+    "HybridRetriever",
+    "create_hybrid_retriever",
     # Legacy/PDF parsing
     "PDFParser",
     "TextChunk",

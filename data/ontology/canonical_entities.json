@@ -1,0 +1,489 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "D&D 5E Canonical Entities",
+  "description": "Seed data for entity resolution - canonical names and their aliases",
+  "version": "1.0.0",
+
+  "entities": {
+    "Save": {
+      "STR": {
+        "aliases": ["Strength save", "Strength saving throw", "STR save", "Str save", "strength"],
+        "attributes": {"ability": "Strength"}
+      },
+      "DEX": {
+        "aliases": ["Dexterity save", "Dexterity saving throw", "DEX save", "Dex save", "dexterity", "Reflex save"],
+        "attributes": {"ability": "Dexterity"}
+      },
+      "CON": {
+        "aliases": ["Constitution save", "Constitution saving throw", "CON save", "Con save", "constitution", "Fortitude save"],
+        "attributes": {"ability": "Constitution"}
+      },
+      "INT": {
+        "aliases": ["Intelligence save", "Intelligence saving throw", "INT save", "Int save", "intelligence"],
+        "attributes": {"ability": "Intelligence"}
+      },
+      "WIS": {
+        "aliases": ["Wisdom save", "Wisdom saving throw", "WIS save", "Wis save", "wisdom", "Will save"],
+        "attributes": {"ability": "Wisdom"}
+      },
+      "CHA": {
+        "aliases": ["Charisma save", "Charisma saving throw", "CHA save", "Cha save", "charisma"],
+        "attributes": {"ability": "Charisma"}
+      }
+    },
+
+    "DamageType": {
+      "Fire": {"aliases": ["fire damage", "Fire damage", "flames", "burning"]},
+      "Cold": {"aliases": ["cold damage", "Cold damage", "ice damage", "frost damage", "freezing"]},
+      "Lightning": {"aliases": ["lightning damage", "Lightning damage", "electric damage", "electricity"]},
+      "Thunder": {"aliases": ["thunder damage", "Thunder damage", "sonic damage"]},
+      "Acid": {"aliases": ["acid damage", "Acid damage", "corrosive"]},
+      "Poison": {"aliases": ["poison damage", "Poison damage", "toxic"]},
+      "Necrotic": {"aliases": ["necrotic damage", "Necrotic damage", "death damage", "negative energy"]},
+      "Radiant": {"aliases": ["radiant damage", "Radiant damage", "holy damage", "divine damage"]},
+      "Force": {"aliases": ["force damage", "Force damage", "magical force"]},
+      "Psychic": {"aliases": ["psychic damage", "Psychic damage", "mental damage"]},
+      "Bludgeoning": {"aliases": ["bludgeoning damage", "Bludgeoning damage", "blunt damage"]},
+      "Piercing": {"aliases": ["piercing damage", "Piercing damage", "puncture damage"]},
+      "Slashing": {"aliases": ["slashing damage", "Slashing damage", "cutting damage"]}
+    },
+
+    "Condition": {
+      "Blinded": {"aliases": ["blinded", "blind", "cannot see", "Blind"]},
+      "Charmed": {"aliases": ["charmed", "charm", "Charm"]},
+      "Deafened": {"aliases": ["deafened", "deaf", "cannot hear", "Deaf"]},
+      "Frightened": {"aliases": ["frightened", "fear", "afraid", "scared", "Fear"]},
+      "Grappled": {"aliases": ["grappled", "grapple", "grabbed", "Grapple"]},
+      "Incapacitated": {"aliases": ["incapacitated", "Incapacitate"]},
+      "Invisible": {"aliases": ["invisible", "invisibility", "unseen", "Invisibility"]},
+      "Paralyzed": {"aliases": ["paralyzed", "paralysis", "Paralysis"]},
+      "Petrified": {"aliases": ["petrified", "stone", "turned to stone", "Petrification"]},
+      "Poisoned": {"aliases": ["poisoned", "poison", "Poison"]},
+      "Prone": {"aliases": ["prone", "knocked down", "on the ground", "lying down"]},
+      "Restrained": {"aliases": ["restrained", "restrain", "held in place", "Restrain"]},
+      "Stunned": {"aliases": ["stunned", "stun", "dazed", "Stun"]},
+      "Unconscious": {"aliases": ["unconscious", "knocked out", "KO", "out cold"]}
+    },
+
+    "Action": {
+      "Action": {"aliases": ["action", "standard action", "main action", "your action"]},
+      "BonusAction": {"aliases": ["bonus action", "Bonus Action", "bonus", "swift action"]},
+      "Reaction": {"aliases": ["reaction", "Reaction", "immediate action"]},
+      "Movement": {"aliases": ["movement", "move", "move action"]},
+      "FreeAction": {"aliases": ["free action", "Free Action", "free"]},
+      "LegendaryAction": {"aliases": ["legendary action", "Legendary Action", "legendary"]},
+      "LairAction": {"aliases": ["lair action", "Lair Action"]}
+    },
+
+    "Class": {
+      "Barbarian": {"aliases": ["barbarian", "Barbarian class", "the Barbarian"]},
+      "Bard": {"aliases": ["bard", "Bard class", "the Bard"]},
+      "Cleric": {"aliases": ["cleric", "Cleric class", "the Cleric"]},
+      "Druid": {"aliases": ["druid", "Druid class", "the Druid"]},
+      "Fighter": {"aliases": ["fighter", "Fighter class", "the Fighter"]},
+      "Monk": {"aliases": ["monk", "Monk class", "the Monk"]},
+      "Paladin": {"aliases": ["paladin", "Paladin class", "the Paladin"]},
+      "Ranger": {"aliases": ["ranger", "Ranger class", "the Ranger"]},
+      "Rogue": {"aliases": ["rogue", "Rogue class", "the Rogue"]},
+      "Sorcerer": {"aliases": ["sorcerer", "Sorcerer class", "the Sorcerer"]},
+      "Warlock": {"aliases": ["warlock", "Warlock class", "the Warlock"]},
+      "Wizard": {"aliases": ["wizard", "Wizard class", "the Wizard", "Wizards"]}
+    },
+
+    "Race": {
+      "Dwarf": {"aliases": ["dwarf", "dwarves", "Dwarves", "dwarven"]},
+      "Elf": {"aliases": ["elf", "elves", "Elves", "elven"]},
+      "Halfling": {"aliases": ["halfling", "halflings", "Halflings"]},
+      "Human": {"aliases": ["human", "humans", "Humans"]},
+      "Dragonborn": {"aliases": ["dragonborn", "Dragonborn"]},
+      "Gnome": {"aliases": ["gnome", "gnomes", "Gnomes"]},
+      "Half-Elf": {"aliases": ["half-elf", "half elf", "Half Elf", "half-elves"]},
+      "Half-Orc": {"aliases": ["half-orc", "half orc", "Half Orc", "half-orcs"]},
+      "Tiefling": {"aliases": ["tiefling", "tieflings", "Tieflings"]}
+    },
+
+    "AbilityScore": {
+      "Strength": {"aliases": ["strength", "STR", "Str"]},
+      "Dexterity": {"aliases": ["dexterity", "DEX", "Dex"]},
+      "Constitution": {"aliases": ["constitution", "CON", "Con"]},
+      "Intelligence": {"aliases": ["intelligence", "INT", "Int"]},
+      "Wisdom": {"aliases": ["wisdom", "WIS", "Wis"]},
+      "Charisma": {"aliases": ["charisma", "CHA", "Cha"]}
+    },
+
+    "SpellSchool": {
+      "Abjuration": {"aliases": ["abjuration", "Abjuration school", "abjuration magic"]},
+      "Conjuration": {"aliases": ["conjuration", "Conjuration school", "conjuration magic"]},
+      "Divination": {"aliases": ["divination", "Divination school", "divination magic"]},
+      "Enchantment": {"aliases": ["enchantment", "Enchantment school", "enchantment magic"]},
+      "Evocation": {"aliases": ["evocation", "Evocation school", "evocation magic"]},
+      "Illusion": {"aliases": ["illusion", "Illusion school", "illusion magic"]},
+      "Necromancy": {"aliases": ["necromancy", "Necromancy school", "necromancy magic"]},
+      "Transmutation": {"aliases": ["transmutation", "Transmutation school", "transmutation magic"]}
+    },
+
+    "CreatureType": {
+      "Aberration": {"aliases": ["aberration", "aberrations"]},
+      "Beast": {"aliases": ["beast", "beasts", "animal", "animals"]},
+      "Celestial": {"aliases": ["celestial", "celestials", "angel", "angels"]},
+      "Construct": {"aliases": ["construct", "constructs", "golem", "golems"]},
+      "Dragon": {"aliases": ["dragon", "dragons", "draconic"]},
+      "Elemental": {"aliases": ["elemental", "elementals"]},
+      "Fey": {"aliases": ["fey", "faerie", "fairy"]},
+      "Fiend": {"aliases": ["fiend", "fiends", "demon", "devil", "demons", "devils"]},
+      "Giant": {"aliases": ["giant", "giants"]},
+      "Humanoid": {"aliases": ["humanoid", "humanoids"]},
+      "Monstrosity": {"aliases": ["monstrosity", "monstrosities"]},
+      "Ooze": {"aliases": ["ooze", "oozes", "slime"]},
+      "Plant": {"aliases": ["plant", "plants"]},
+      "Undead": {"aliases": ["undead", "zombie", "skeleton", "vampires", "zombies", "skeletons"]}
+    },
+
+    "Mechanic": {
+      "Concentration": {"aliases": ["concentration", "Concentration", "concentrating"]},
+      "Opportunity Attack": {"aliases": ["opportunity attack", "attack of opportunity", "AoO", "OA"]},
+      "Advantage": {"aliases": ["advantage", "Advantage", "with advantage"]},
+      "Disadvantage": {"aliases": ["disadvantage", "Disadvantage", "with disadvantage"]},
+      "Cover": {"aliases": ["cover", "Cover", "half cover", "three-quarters cover", "full cover"]},
+      "Grapple": {"aliases": ["grapple", "Grapple", "grappling"]},
+      "Shove": {"aliases": ["shove", "Shove", "push"]},
+      "Critical Hit": {"aliases": ["critical hit", "crit", "natural 20", "nat 20"]},
+      "Death Saving Throw": {"aliases": ["death saving throw", "death save", "death saves"]},
+      "Short Rest": {"aliases": ["short rest", "Short Rest"]},
+      "Long Rest": {"aliases": ["long rest", "Long Rest"]},
+      "Spellcasting": {"aliases": ["spellcasting", "Spellcasting", "casting spells"]},
+      "Multiattack": {"aliases": ["multiattack", "Multiattack", "multi-attack"]},
+      "Sneak Attack Damage": {"aliases": ["sneak attack damage", "extra sneak attack dice"]}
+    },
+
+    "ClassFeature": {
+      "Evasion": {
+        "aliases": ["evasion", "Evasion feature"],
+        "attributes": {"classes": ["Monk", "Rogue"], "level_requirement": 7}
+      },
+      "Sneak Attack": {
+        "aliases": ["sneak attack", "Sneak Attack", "sneak attack damage"],
+        "attributes": {"classes": ["Rogue"], "level_requirement": 1}
+      },
+      "Action Surge": {
+        "aliases": ["action surge", "Action Surge"],
+        "attributes": {"classes": ["Fighter"], "level_requirement": 2}
+      },
+      "Rage": {
+        "aliases": ["rage", "Rage", "raging", "barbarian rage"],
+        "attributes": {"classes": ["Barbarian"], "level_requirement": 1}
+      },
+      "Wild Shape": {
+        "aliases": ["wild shape", "Wild Shape", "wildshape"],
+        "attributes": {"classes": ["Druid"], "level_requirement": 2}
+      },
+      "Divine Smite": {
+        "aliases": ["divine smite", "Divine Smite", "smite"],
+        "attributes": {"classes": ["Paladin"], "level_requirement": 2}
+      },
+      "Ki": {
+        "aliases": ["ki", "Ki", "ki points"],
+        "attributes": {"classes": ["Monk"], "level_requirement": 2}
+      },
+      "Stunning Strike": {
+        "aliases": ["stunning strike", "Stunning Strike"],
+        "attributes": {"classes": ["Monk"], "level_requirement": 5}
+      },
+      "Uncanny Dodge": {
+        "aliases": ["uncanny dodge", "Uncanny Dodge"],
+        "attributes": {"classes": ["Rogue"], "level_requirement": 5}
+      },
+      "Extra Attack": {
+        "aliases": ["extra attack", "Extra Attack"],
+        "attributes": {"classes": ["Fighter", "Paladin", "Ranger", "Monk", "Barbarian"], "level_requirement": 5}
+      },
+      "Cunning Action": {
+        "aliases": ["cunning action", "Cunning Action"],
+        "attributes": {"classes": ["Rogue"], "level_requirement": 2}
+      },
+      "Martial Arts": {
+        "aliases": ["martial arts", "Martial Arts"],
+        "attributes": {"classes": ["Monk"], "level_requirement": 1}
+      },
+      "Unarmored Defense": {
+        "aliases": ["unarmored defense", "Unarmored Defense"],
+        "attributes": {"classes": ["Barbarian", "Monk"], "level_requirement": 1}
+      },
+      "Reckless Attack": {
+        "aliases": ["reckless attack", "Reckless Attack"],
+        "attributes": {"classes": ["Barbarian"], "level_requirement": 2}
+      },
+      "Channel Divinity": {
+        "aliases": ["channel divinity", "Channel Divinity"],
+        "attributes": {"classes": ["Cleric", "Paladin"], "level_requirement": 2}
+      },
+      "Lay on Hands": {
+        "aliases": ["lay on hands", "Lay on Hands"],
+        "attributes": {"classes": ["Paladin"], "level_requirement": 1}
+      },
+      "Fighting Style": {
+        "aliases": ["fighting style", "Fighting Style"],
+        "attributes": {"classes": ["Fighter", "Paladin", "Ranger"], "level_requirement": 1}
+      },
+      "Second Wind": {
+        "aliases": ["second wind", "Second Wind"],
+        "attributes": {"classes": ["Fighter"], "level_requirement": 1}
+      },
+      "Bardic Inspiration": {
+        "aliases": ["bardic inspiration", "Bardic Inspiration", "inspiration die"],
+        "attributes": {"classes": ["Bard"], "level_requirement": 1}
+      }
+    },
+
+    "Feat": {
+      "Lucky": {
+        "aliases": ["lucky", "Lucky feat"],
+        "attributes": {"prerequisites": []}
+      },
+      "Sentinel": {
+        "aliases": ["sentinel", "Sentinel feat"],
+        "attributes": {"prerequisites": []}
+      },
+      "Shield Master": {
+        "aliases": ["shield master", "Shield Master feat"],
+        "attributes": {"prerequisites": []}
+      },
+      "Great Weapon Master": {
+        "aliases": ["great weapon master", "Great Weapon Master feat", "GWM"],
+        "attributes": {"prerequisites": []}
+      },
+      "Sharpshooter": {
+        "aliases": ["sharpshooter", "Sharpshooter feat"],
+        "attributes": {"prerequisites": []}
+      },
+      "Polearm Master": {
+        "aliases": ["polearm master", "Polearm Master feat", "PAM"],
+        "attributes": {"prerequisites": []}
+      },
+      "War Caster": {
+        "aliases": ["war caster", "War Caster feat", "warcaster"],
+        "attributes": {"prerequisites": ["Spellcasting"]}
+      },
+      "Resilient": {
+        "aliases": ["resilient", "Resilient feat"],
+        "attributes": {"prerequisites": []}
+      },
+      "Alert": {
+        "aliases": ["alert", "Alert feat"],
+        "attributes": {"prerequisites": []}
+      },
+      "Mobile": {
+        "aliases": ["mobile", "Mobile feat"],
+        "attributes": {"prerequisites": []}
+      },
+      "Elven Accuracy": {
+        "aliases": ["elven accuracy", "Elven Accuracy feat"],
+        "attributes": {"prerequisites": ["Elf", "Half-Elf"]}
+      },
+      "Crossbow Expert": {
+        "aliases": ["crossbow expert", "Crossbow Expert feat", "XBE"],
+        "attributes": {"prerequisites": []}
+      }
+    },
+
+    "SpellLevel": {
+      "0": {"aliases": ["cantrip", "cantrips", "level 0", "0th level"]},
+      "1": {"aliases": ["1st level", "level 1", "first level"]},
+      "2": {"aliases": ["2nd level", "level 2", "second level"]},
+      "3": {"aliases": ["3rd level", "level 3", "third level"]},
+      "4": {"aliases": ["4th level", "level 4", "fourth level"]},
+      "5": {"aliases": ["5th level", "level 5", "fifth level"]},
+      "6": {"aliases": ["6th level", "level 6", "sixth level"]},
+      "7": {"aliases": ["7th level", "level 7", "seventh level"]},
+      "8": {"aliases": ["8th level", "level 8", "eighth level"]},
+      "9": {"aliases": ["9th level", "level 9", "ninth level"]}
+    },
+
+    "Spell": {
+      "Fireball": {
+        "aliases": ["fireball", "Fireball spell"],
+        "attributes": {"level": 3, "school": "Evocation", "save": "DEX", "damage_type": "Fire"}
+      },
+      "Shield": {
+        "aliases": ["shield spell", "Shield spell"],
+        "attributes": {"level": 1, "school": "Abjuration", "action": "Reaction"}
+      },
+      "Magic Missile": {
+        "aliases": ["magic missile", "Magic Missile spell"],
+        "attributes": {"level": 1, "school": "Evocation", "damage_type": "Force"}
+      },
+      "Cure Wounds": {
+        "aliases": ["cure wounds", "Cure Wounds spell"],
+        "attributes": {"level": 1, "school": "Evocation"}
+      },
+      "Healing Word": {
+        "aliases": ["healing word", "Healing Word spell"],
+        "attributes": {"level": 1, "school": "Evocation", "action": "BonusAction"}
+      },
+      "Hold Person": {
+        "aliases": ["hold person", "Hold Person spell"],
+        "attributes": {"level": 2, "school": "Enchantment", "save": "WIS", "condition": "Paralyzed"}
+      },
+      "Counterspell": {
+        "aliases": ["counterspell", "Counterspell spell", "counter spell"],
+        "attributes": {"level": 3, "school": "Abjuration", "action": "Reaction"}
+      },
+      "Misty Step": {
+        "aliases": ["misty step", "Misty Step spell"],
+        "attributes": {"level": 2, "school": "Conjuration", "action": "BonusAction"}
+      },
+      "Haste": {
+        "aliases": ["haste", "Haste spell"],
+        "attributes": {"level": 3, "school": "Transmutation", "concentration": true}
+      },
+      "Lightning Bolt": {
+        "aliases": ["lightning bolt", "Lightning Bolt spell"],
+        "attributes": {"level": 3, "school": "Evocation", "save": "DEX", "damage_type": "Lightning"}
+      },
+      "Thunderwave": {
+        "aliases": ["thunderwave", "Thunderwave spell"],
+        "attributes": {"level": 1, "school": "Evocation", "save": "CON", "damage_type": "Thunder"}
+      },
+      "Bless": {
+        "aliases": ["bless", "Bless spell"],
+        "attributes": {"level": 1, "school": "Enchantment", "concentration": true}
+      },
+      "Hex": {
+        "aliases": ["hex", "Hex spell"],
+        "attributes": {"level": 1, "school": "Enchantment", "concentration": true, "action": "BonusAction"}
+      },
+      "Hunter's Mark": {
+        "aliases": ["hunter's mark", "Hunters Mark", "Hunter's Mark spell"],
+        "attributes": {"level": 1, "school": "Divination", "concentration": true, "action": "BonusAction"}
+      },
+      "Dispel Magic": {
+        "aliases": ["dispel magic", "Dispel Magic spell"],
+        "attributes": {"level": 3, "school": "Abjuration"}
+      },
+      "Fire Bolt": {
+        "aliases": ["fire bolt", "Fire Bolt cantrip", "firebolt"],
+        "attributes": {"level": 0, "school": "Evocation", "damage_type": "Fire"}
+      },
+      "Eldritch Blast": {
+        "aliases": ["eldritch blast", "Eldritch Blast cantrip", "EB"],
+        "attributes": {"level": 0, "school": "Evocation", "damage_type": "Force"}
+      },
+      "Mage Hand": {
+        "aliases": ["mage hand", "Mage Hand cantrip"],
+        "attributes": {"level": 0, "school": "Conjuration"}
+      },
+      "Prestidigitation": {
+        "aliases": ["prestidigitation", "Prestidigitation cantrip"],
+        "attributes": {"level": 0, "school": "Transmutation"}
+      }
+    }
+  },
+
+  "relationships": {
+    "class_features": [
+      {"subject": "Monk", "predicate": "grants_feature", "object": "Evasion", "metadata": {"level_requirement": 7}},
+      {"subject": "Rogue", "predicate": "grants_feature", "object": "Evasion", "metadata": {"level_requirement": 7}},
+      {"subject": "Rogue", "predicate": "grants_feature", "object": "Sneak Attack", "metadata": {"level_requirement": 1}},
+      {"subject": "Rogue", "predicate": "grants_feature", "object": "Cunning Action", "metadata": {"level_requirement": 2}},
+      {"subject": "Rogue", "predicate": "grants_feature", "object": "Uncanny Dodge", "metadata": {"level_requirement": 5}},
+      {"subject": "Fighter", "predicate": "grants_feature", "object": "Action Surge", "metadata": {"level_requirement": 2}},
+      {"subject": "Fighter", "predicate": "grants_feature", "object": "Second Wind", "metadata": {"level_requirement": 1}},
+      {"subject": "Fighter", "predicate": "grants_feature", "object": "Extra Attack", "metadata": {"level_requirement": 5}},
+      {"subject": "Barbarian", "predicate": "grants_feature", "object": "Rage", "metadata": {"level_requirement": 1}},
+      {"subject": "Barbarian", "predicate": "grants_feature", "object": "Reckless Attack", "metadata": {"level_requirement": 2}},
+      {"subject": "Barbarian", "predicate": "grants_feature", "object": "Unarmored Defense", "metadata": {"level_requirement": 1}},
+      {"subject": "Barbarian", "predicate": "grants_feature", "object": "Extra Attack", "metadata": {"level_requirement": 5}},
+      {"subject": "Monk", "predicate": "grants_feature", "object": "Martial Arts", "metadata": {"level_requirement": 1}},
+      {"subject": "Monk", "predicate": "grants_feature", "object": "Ki", "metadata": {"level_requirement": 2}},
+      {"subject": "Monk", "predicate": "grants_feature", "object": "Unarmored Defense", "metadata": {"level_requirement": 1}},
+      {"subject": "Monk", "predicate": "grants_feature", "object": "Stunning Strike", "metadata": {"level_requirement": 5}},
+      {"subject": "Monk", "predicate": "grants_feature", "object": "Extra Attack", "metadata": {"level_requirement": 5}},
+      {"subject": "Paladin", "predicate": "grants_feature", "object": "Divine Smite", "metadata": {"level_requirement": 2}},
+      {"subject": "Paladin", "predicate": "grants_feature", "object": "Lay on Hands", "metadata": {"level_requirement": 1}},
+      {"subject": "Paladin", "predicate": "grants_feature", "object": "Extra Attack", "metadata": {"level_requirement": 5}},
+      {"subject": "Druid", "predicate": "grants_feature", "object": "Wild Shape", "metadata": {"level_requirement": 2}},
+      {"subject": "Bard", "predicate": "grants_feature", "object": "Bardic Inspiration", "metadata": {"level_requirement": 1}}
+    ],
+    "feature_mechanics": [
+      {"subject": "Evasion", "predicate": "overrules", "object": "DEX", "metadata": {"condition": "On successful save, take no damage instead of half"}},
+      {"subject": "Shield Master", "predicate": "overrules", "object": "DEX", "metadata": {"condition": "Add shield AC bonus to Dexterity saving throws against effects that target only you"}},
+      {"subject": "Uncanny Dodge", "predicate": "overrules", "object": "Attack", "metadata": {"condition": "Use reaction to halve attack damage"}},
+      {"subject": "Rage", "predicate": "resistant_to", "object": "Bludgeoning"},
+      {"subject": "Rage", "predicate": "resistant_to", "object": "Piercing"},
+      {"subject": "Rage", "predicate": "resistant_to", "object": "Slashing"},
+      {"subject": "Reckless Attack", "predicate": "advantage_on", "object": "Attack"},
+      {"subject": "Cunning Action", "predicate": "costs_action", "object": "BonusAction"},
+      {"subject": "Action Surge", "predicate": "grants_extra_action", "object": "Action", "metadata": {"uses_per_rest": "short"}},
+      {"subject": "Stunning Strike", "predicate": "inflicts_condition", "object": "Stunned"},
+      {"subject": "Stunning Strike", "predicate": "requires_save", "object": "CON"}
+    ],
+    "spell_mechanics": [
+      {"subject": "Fireball", "predicate": "requires_save", "object": "DEX"},
+      {"subject": "Fireball", "predicate": "deals_damage", "object": "Fire"},
+      {"subject": "Fireball", "predicate": "costs_action", "object": "Action"},
+      {"subject": "Fireball", "predicate": "has_spell_school", "object": "Evocation"},
+      {"subject": "Lightning Bolt", "predicate": "requires_save", "object": "DEX"},
+      {"subject": "Lightning Bolt", "predicate": "deals_damage", "object": "Lightning"},
+      {"subject": "Lightning Bolt", "predicate": "costs_action", "object": "Action"},
+      {"subject": "Thunderwave", "predicate": "requires_save", "object": "CON"},
+      {"subject": "Thunderwave", "predicate": "deals_damage", "object": "Thunder"},
+      {"subject": "Hold Person", "predicate": "requires_save", "object": "WIS"},
+      {"subject": "Hold Person", "predicate": "inflicts_condition", "object": "Paralyzed"},
+      {"subject": "Hold Person", "predicate": "requires_concentration", "object": "Concentration"},
+      {"subject": "Haste", "predicate": "grants_extra_action", "object": "Action"},
+      {"subject": "Haste", "predicate": "requires_concentration", "object": "Concentration"},
+      {"subject": "Shield", "predicate": "costs_action", "object": "Reaction"},
+      {"subject": "Counterspell", "predicate": "costs_action", "object": "Reaction"},
+      {"subject": "Counterspell", "predicate": "counters", "object": "Spell"},
+      {"subject": "Misty Step", "predicate": "costs_action", "object": "BonusAction"},
+      {"subject": "Healing Word", "predicate": "costs_action", "object": "BonusAction"},
+      {"subject": "Hex", "predicate": "costs_action", "object": "BonusAction"},
+      {"subject": "Hex", "predicate": "requires_concentration", "object": "Concentration"},
+      {"subject": "Hunter's Mark", "predicate": "costs_action", "object": "BonusAction"},
+      {"subject": "Hunter's Mark", "predicate": "requires_concentration", "object": "Concentration"},
+      {"subject": "Bless", "predicate": "requires_concentration", "object": "Concentration"},
+      {"subject": "Dispel Magic", "predicate": "counters", "object": "Spell"},
+      {"subject": "Magic Missile", "predicate": "deals_damage", "object": "Force"},
+      {"subject": "Fire Bolt", "predicate": "deals_damage", "object": "Fire"},
+      {"subject": "Eldritch Blast", "predicate": "deals_damage", "object": "Force"}
+    ],
+    "racial_traits": [
+      {"subject": "Elf", "predicate": "immune_to", "object": "Charmed", "metadata": {"condition": "Magical sleep only"}},
+      {"subject": "Elf", "predicate": "advantage_on", "object": "CHA", "metadata": {"condition": "Saving throws against being charmed"}},
+      {"subject": "Tiefling", "predicate": "resistant_to", "object": "Fire"},
+      {"subject": "Dwarf", "predicate": "resistant_to", "object": "Poison"},
+      {"subject": "Dwarf", "predicate": "advantage_on", "object": "CON", "metadata": {"condition": "Saving throws against poison"}},
+      {"subject": "Half-Orc", "predicate": "resistant_to", "object": "Critical Hit", "metadata": {"condition": "Relentless Endurance"}}
+    ],
+    "feat_prerequisites": [
+      {"subject": "Elf", "predicate": "prerequisite_of", "object": "Elven Accuracy"},
+      {"subject": "Half-Elf", "predicate": "prerequisite_of", "object": "Elven Accuracy"},
+      {"subject": "Spellcasting", "predicate": "prerequisite_of", "object": "War Caster"}
+    ],
+    "condition_effects": [
+      {"subject": "Blinded", "predicate": "disadvantage_on", "object": "Attack"},
+      {"subject": "Blinded", "predicate": "advantage_on", "object": "Attack", "metadata": {"condition": "Attackers gain advantage against blinded creature"}},
+      {"subject": "Prone", "predicate": "disadvantage_on", "object": "Attack"},
+      {"subject": "Prone", "predicate": "advantage_on", "object": "Attack", "metadata": {"condition": "Melee attackers within 5 feet gain advantage"}},
+      {"subject": "Prone", "predicate": "disadvantage_on", "object": "Attack", "metadata": {"condition": "Ranged attackers have disadvantage"}},
+      {"subject": "Paralyzed", "predicate": "advantage_on", "object": "Attack", "metadata": {"condition": "Attacks against paralyzed creature"}},
+      {"subject": "Stunned", "predicate": "advantage_on", "object": "Attack", "metadata": {"condition": "Attacks against stunned creature"}},
+      {"subject": "Invisible", "predicate": "advantage_on", "object": "Attack"},
+      {"subject": "Invisible", "predicate": "disadvantage_on", "object": "Attack", "metadata": {"condition": "Attacks against invisible creature"}},
+      {"subject": "Frightened", "predicate": "disadvantage_on", "object": "Attack", "metadata": {"condition": "While source of fear is in line of sight"}},
+      {"subject": "Restrained", "predicate": "disadvantage_on", "object": "Attack"},
+      {"subject": "Restrained", "predicate": "disadvantage_on", "object": "DEX"},
+      {"subject": "Restrained", "predicate": "advantage_on", "object": "Attack", "metadata": {"condition": "Attacks against restrained creature"}},
+      {"subject": "Poisoned", "predicate": "disadvantage_on", "object": "Attack"},
+      {"subject": "Poisoned", "predicate": "disadvantage_on", "object": "Skill", "metadata": {"condition": "Ability checks"}}
+    ],
+    "creature_type_traits": [
+      {"subject": "Undead", "predicate": "immune_to", "object": "Poisoned"},
+      {"subject": "Undead", "predicate": "immune_to", "object": "Poison"},
+      {"subject": "Construct", "predicate": "immune_to", "object": "Poisoned"},
+      {"subject": "Construct", "predicate": "immune_to", "object": "Poison"},
+      {"subject": "Construct", "predicate": "immune_to", "object": "Charmed"},
+      {"subject": "Construct", "predicate": "immune_to", "object": "Frightened"}
+    ]
+  }
+}

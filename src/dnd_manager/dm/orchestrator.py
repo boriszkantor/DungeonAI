@@ -15,6 +15,7 @@ NEURO-SYMBOLIC PRINCIPLE:
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -32,6 +33,16 @@ from dnd_manager.ingestion.universal_loader import (
     DocumentType,
     OpenRouterClient,
 )
+from dnd_manager.ingestion.rag_store import (
+    RAGStore,
+    HyDERetriever,
+)
+from dnd_manager.ingestion.hybrid_retriever import (
+    HybridRetriever,
+    HybridSearchResult,
+    create_hybrid_retriever,
+)
+from dnd_manager.dm.memory import SessionMemory
 from dnd_manager.models.ecs import (
     ActorEntity,
     Condition,
@@ -3269,6 +3280,11 @@ class DMOrchestrator:
         openrouter_client: OpenRouterClient | None = None,
         model: str = "google/gemini-3-pro-preview",
         conversation_history: list[dict[str, Any]] | None = None,
+        rag_store: RAGStore | None = None,
+        enable_hyde: bool = True,
+        enable_memory: bool = True,
+        enable_hybrid_rag: bool = True,
+        knowledge_graph_path: str | None = None,
     ) -> None:
         """Initialize the DM orchestrator.
         
@@ -3276,8 +3292,14 @@ class DMOrchestrator:
             game_state: The game state (source of truth).
             chroma_store: Vector store for RAG retrieval.
             openrouter_client: OpenRouter client.
-            model: LLM model to use for reasoning.
+            model: LLM model to use for reasoning (defaults to gemini-3-pro-preview).
+                   Note: The UI always passes the user's selected model explicitly.
             conversation_history: Existing conversation history to continue from.
+            rag_store: Optional RAGStore for enhanced retrieval.
+            enable_hyde: Whether to use HyDE for rule lookups.
+            enable_memory: Whether to use SessionMemory for context management.
+            enable_hybrid_rag: Whether to use hybrid graph-vector retrieval.
+            knowledge_graph_path: Path to load/save the knowledge graph.
         """
         self.game_state = game_state
         self.chroma_store = chroma_store or ChromaStore()
@@ -3285,9 +3307,69 @@ class DMOrchestrator:
         self.model = model
         self.tools = create_dm_tools(game_state, chroma_store=self.chroma_store)
         self.conversation_history: list[dict[str, Any]] = conversation_history or []
+        
+        # Initialize HyDE retriever if RAG store provided and enabled
+        self.rag_store = rag_store
+        self.hyde_retriever: HyDERetriever | None = None
+        if enable_hyde and rag_store:
+            self.hyde_retriever = HyDERetriever(rag_store, model=model)
+            logger.info("HyDE retriever enabled for semantic rule lookups")
+        
+        # Initialize hybrid retriever for graph-vector search
+        self.hybrid_retriever: HybridRetriever | None = None
+        self.enable_hybrid_rag = enable_hybrid_rag
+        if enable_hybrid_rag:
+            try:
+                self.hybrid_retriever = create_hybrid_retriever(
+                    self.chroma_store,
+                    graph_path=knowledge_graph_path,
+                    load_seed_data=True,
+                )
+                logger.info("Hybrid RAG enabled with knowledge graph")
+            except Exception as exc:
+                logger.warning(f"Failed to initialize hybrid retriever: {exc}")
+                self.enable_hybrid_rag = False
+        
+        # Initialize session memory if enabled
+        self.memory: SessionMemory | None = None
+        if enable_memory:
+            self.memory = SessionMemory(
+                rag_store=rag_store,
+                max_short_term=20,
+                model=model,
+            )
+            # Load existing conversation history into memory
+            if conversation_history:
+                for msg in conversation_history:
+                    self.memory.add_message(msg)
+            logger.info("SessionMemory enabled for context management")
 
         logger.info(f"DMOrchestrator initialized with model {model}, history={len(self.conversation_history)} messages")
 
+    def _is_rule_query(self, query: str) -> bool:
+        """Detect if a query is asking about game rules/mechanics.
+        
+        Args:
+            query: User input.
+            
+        Returns:
+            True if this appears to be a rule-related query.
+        """
+        query_lower = query.lower()
+        
+        # Rule-related keywords
+        rule_keywords = [
+            "can i", "how do i", "how does", "what happens if",
+            "rule", "rules", "ability", "feature", "spell", "cast",
+            "attack", "damage", "save", "saving throw", "check",
+            "bonus action", "reaction", "movement", "range",
+            "advantage", "disadvantage", "proficiency",
+            "jump", "climb", "swim", "fly", "fall", "grapple",
+            "concentration", "ritual", "slot", "short rest", "long rest",
+        ]
+        
+        return any(keyword in query_lower for keyword in rule_keywords)
+    
     def _clean_rag_content(self, content: str) -> str:
         """Clean RAG content of OCR artifacts and formatting issues.
         
@@ -3329,6 +3411,9 @@ class DMOrchestrator:
         """Retrieve relevant context from RAG store.
         
         Prioritizes adventure content for the current campaign.
+        Uses hybrid graph-vector retrieval for rule-related queries to find
+        related rules (e.g., Evasion when a Monk is hit by Fireball).
+        Falls back to HyDE or standard vector search if hybrid unavailable.
         
         Args:
             query: User's input to find relevant info for.
@@ -3371,15 +3456,70 @@ class DMOrchestrator:
                 if clean_content:
                     context_parts.append(f"**[ADVENTURE - {title}]**:\n{clean_content}")
             
-            # Also search for rules/sourcebook content
-            rules_results = self.chroma_store.search(query, n_results=2)
-            for doc in rules_results:
-                if doc.chunk_id not in seen_ids:
-                    title = doc.metadata.get("title", "Rules")
-                    source = doc.source
-                    clean_content = self._clean_rag_content(doc.content[:600])
-                    if clean_content:
-                        context_parts.append(f"**[RULES - {title}]** ({source}):\n{clean_content}")
+            # Search for rules/sourcebook content
+            # Use HYBRID retrieval for rule queries to find related rules (specific beats general)
+            if self.hybrid_retriever and self._is_rule_query(query):
+                logger.debug("Using HYBRID graph-vector search for rule query", query=query[:50])
+                try:
+                    # Get active character for character-aware filtering
+                    active_character = None
+                    if self.game_state.party:
+                        # Try to find the character mentioned in query, or use first party member
+                        for char in self.game_state.party:
+                            if char.name.lower() in query.lower():
+                                active_character = char
+                                break
+                        if not active_character:
+                            active_character = self.game_state.party[0] if self.game_state.party else None
+                    
+                    # Perform hybrid search
+                    hybrid_result = self.hybrid_retriever.search(
+                        query,
+                        character=active_character,
+                        n_results=3,
+                    )
+                    
+                    # Add vector search results
+                    for result in hybrid_result.vector_results:
+                        chunk_id = None
+                        if hasattr(result, "content") and hasattr(result.content, "content_id"):
+                            chunk_id = result.content.content_id
+                            title = result.content.title or "Rules"
+                            source = result.content.source
+                            text = result.content.text
+                        elif hasattr(result, "chunk_id"):
+                            chunk_id = result.chunk_id
+                            title = result.metadata.get("title", "Rules")
+                            source = result.source
+                            text = result.content
+                        else:
+                            continue
+                        
+                        if chunk_id and chunk_id not in seen_ids:
+                            seen_ids.add(chunk_id)
+                            clean_content = self._clean_rag_content(text[:600])
+                            if clean_content:
+                                context_parts.append(f"**[RULES - {title}]** ({source}):\n{clean_content}")
+                    
+                    # Add graph context (related rules from knowledge graph)
+                    if hybrid_result.graph_context:
+                        context_parts.append(f"**[RELATED RULES - Knowledge Graph]**:\n{hybrid_result.graph_context}")
+                        
+                except Exception as hybrid_exc:
+                    logger.warning(f"Hybrid retrieval failed, falling back to HyDE: {hybrid_exc}")
+                    # Fallback to HyDE
+                    if self.hyde_retriever:
+                        self._fallback_hyde_search(query, seen_ids, context_parts)
+                    else:
+                        self._fallback_standard_search(query, seen_ids, context_parts)
+                        
+            elif self.hyde_retriever and self._is_rule_query(query):
+                # Use HyDE if hybrid not available
+                logger.debug("Using HyDE for rule query", query=query[:50])
+                self._fallback_hyde_search(query, seen_ids, context_parts)
+            else:
+                # Standard search for non-rule queries or when nothing else available
+                self._fallback_standard_search(query, seen_ids, context_parts)
 
             if not context_parts:
                 return "No relevant adventure or rules content found."
@@ -3389,6 +3529,42 @@ class DMOrchestrator:
         except Exception as exc:
             logger.warning(f"RAG retrieval failed: {exc}")
             return "RAG retrieval unavailable."
+
+    def _fallback_hyde_search(
+        self, query: str, seen_ids: set, context_parts: list
+    ) -> None:
+        """Fallback to HyDE search when hybrid fails."""
+        try:
+            hyde_results = self.hyde_retriever.retrieve_with_hyde(
+                query,
+                k=3,
+                fallback_to_direct=True,
+            )
+            
+            for result in hyde_results:
+                if result.content.content_id not in seen_ids:
+                    seen_ids.add(result.content.content_id)
+                    title = result.content.title or "Rules"
+                    source = result.content.source
+                    clean_content = self._clean_rag_content(result.content.text[:600])
+                    if clean_content:
+                        context_parts.append(f"**[RULES - {title}]** ({source}):\n{clean_content}")
+        except Exception as hyde_exc:
+            logger.warning(f"HyDE retrieval failed: {hyde_exc}")
+            self._fallback_standard_search(query, seen_ids, context_parts)
+
+    def _fallback_standard_search(
+        self, query: str, seen_ids: set, context_parts: list
+    ) -> None:
+        """Fallback to standard vector search."""
+        rules_results = self.chroma_store.search(query, n_results=2)
+        for doc in rules_results:
+            if doc.chunk_id not in seen_ids:
+                title = doc.metadata.get("title", "Rules")
+                source = doc.source
+                clean_content = self._clean_rag_content(doc.content[:600])
+                if clean_content:
+                    context_parts.append(f"**[RULES - {title}]** ({source}):\n{clean_content}")
 
     def _build_system_prompt(self, rag_context: str) -> str:
         """Build the system prompt with current context."""
@@ -3451,8 +3627,62 @@ class DMOrchestrator:
             {"role": "system", "content": system_prompt},
         ]
 
-        # Add conversation history (last 10 exchanges)
-        messages.extend(self.conversation_history[-20:])
+        # Add conversation history with smart memory management
+        if self.memory:
+            # #region agent log H1
+            import json
+            with open(r'd:\Projects\D&D Campaign Manager\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                f.write(json.dumps({"location":"orchestrator.py:3544","message":"Attempting memory.get_context_window","data":{"has_memory":True,"user_input_preview":user_input[:50]},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","runId":"initial","hypothesisId":"H1"})+'\n')
+            # #endregion
+            
+            # Use SessionMemory to get context window (includes relevant history)
+            import asyncio
+            try:
+                # #region agent log H1
+                with open(r'd:\Projects\D&D Campaign Manager\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(json.dumps({"location":"orchestrator.py:3548","message":"Before asyncio operations","data":{"has_running_loop":False},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","runId":"initial","hypothesisId":"H1"})+'\n')
+                try:
+                    asyncio.get_running_loop()
+                    with open(r'd:\Projects\D&D Campaign Manager\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                        f.write(json.dumps({"location":"orchestrator.py:3551","message":"Found running loop","data":{"has_running_loop":True},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","runId":"initial","hypothesisId":"H1"})+'\n')
+                except RuntimeError:
+                    with open(r'd:\Projects\D&D Campaign Manager\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                        f.write(json.dumps({"location":"orchestrator.py:3554","message":"No running loop found","data":{"has_running_loop":False},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","runId":"initial","hypothesisId":"H1"})+'\n')
+                # #endregion
+                
+                # Run async get_context_window
+                loop = None
+                try:
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                
+                import asyncio
+                context_messages = asyncio.run(self.memory.get_context_window(
+                    user_input,
+                    include_relevant_history=True,
+                ))
+                
+                # #region agent log H1
+                with open(r'd:\Projects\D&D Campaign Manager\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(json.dumps({"location":"orchestrator.py:3575","message":"Successfully got context from memory","data":{"num_messages":len(context_messages)},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","runId":"initial","hypothesisId":"H1"})+'\n')
+                # #endregion
+                
+                messages.extend(context_messages)
+            except Exception as memory_exc:
+                # #region agent log H1
+                with open(r'd:\Projects\D&D Campaign Manager\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(json.dumps({"location":"orchestrator.py:3582","message":"Memory get_context_window failed","data":{"error":str(memory_exc),"error_type":type(memory_exc).__name__},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","runId":"initial","hypothesisId":"H1"})+'\n')
+                # #endregion
+                logger.warning(f"Failed to get context from SessionMemory, falling back: {memory_exc}")
+                # Fallback to old behavior
+                messages.extend(self.conversation_history[-20:])
+        else:
+            # No memory system, use simple truncation
+            messages.extend(self.conversation_history[-20:])
 
         # Add combat reminder if in combat
         if self.game_state.combat_active:
@@ -3567,7 +3797,8 @@ class DMOrchestrator:
             final_narrative = message.content or ""
 
             # Update conversation history - INCLUDE tool results so DM remembers its actions!
-            self.conversation_history.append({"role": "user", "content": user_input})
+            user_msg = {"role": "user", "content": user_input}
+            self.conversation_history.append(user_msg)
             
             # Build assistant message that includes tool call summaries
             assistant_content = final_narrative
@@ -3579,10 +3810,16 @@ class DMOrchestrator:
                     tool_summary_lines.append(f"- {tr.tool_name}: {tr.result[:300]}...")
                 assistant_content = final_narrative + "\n".join(tool_summary_lines)
             
-            self.conversation_history.append({"role": "assistant", "content": assistant_content})
-
-            # Keep history manageable
-            if len(self.conversation_history) > 40:
+            assistant_msg = {"role": "assistant", "content": assistant_content}
+            self.conversation_history.append(assistant_msg)
+            
+            # Update SessionMemory if enabled
+            if self.memory:
+                self.memory.add_message(user_msg)
+                self.memory.add_message(assistant_msg)
+            
+            # Keep history manageable (SessionMemory handles this better)
+            if not self.memory and len(self.conversation_history) > 40:
                 self.conversation_history = self.conversation_history[-40:]
 
         except Exception as exc:
@@ -3645,6 +3882,44 @@ class DMOrchestrator:
             tool_results=[],
         )
 
+    async def end_scene(self, scene_name: str) -> DMResponse:
+        """End the current scene and summarize it to long-term memory.
+        
+        Args:
+            scene_name: Name of the scene that's ending.
+            
+        Returns:
+            DMResponse with summary confirmation.
+        """
+        if not self.memory:
+            return DMResponse(
+                narrative="Scene ended (memory system not enabled).",
+                tool_results=[],
+            )
+        
+        try:
+            entry = await self.memory.end_scene(scene_name)
+            
+            narrative = (
+                f"📖 **Scene Archived: {scene_name}**\n\n"
+                f"{entry.summary}\n\n"
+                f"*This scene has been summarized and saved to your quest log.*"
+            )
+            
+            logger.info(f"Scene ended and summarized: {scene_name}")
+            
+            return DMResponse(
+                narrative=narrative,
+                tool_results=[],
+            )
+            
+        except Exception as exc:
+            logger.exception("Failed to end scene")
+            return DMResponse(
+                narrative=f"Scene ended (summarization failed: {exc}).",
+                tool_results=[],
+            )
+    
     def end_combat(self) -> DMResponse:
         """End the current combat encounter."""
         self.game_state.combat_active = False

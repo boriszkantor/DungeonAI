@@ -49,6 +49,9 @@ dependencies = [
     # Vector Store & RAG
     "chromadb>=0.4.0",             # Primary vector DB (local persistence)
     "langchain-text-splitters>=0.0.1",  # Text chunking utilities
+    # Knowledge Graph
+    "networkx>=3.0",               # Graph operations for hybrid RAG
+    "rapidfuzz>=3.0",              # Fast fuzzy string matching for entity resolution
     # Game Logic
     "d20>=1.1.0",                  # Dice rolling & expression parsing
     "numpy>=1.26.0,<2.0",
