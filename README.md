@@ -4,7 +4,7 @@ An AI Dungeon Master for D&D 5th Edition that uses your own rulebooks.
 
 ## What It Does
 
-DungeonAI is a **solo D&D experience** where you chat with an AI Dungeon Master. You upload your rulebooks (PHB, DMG, Monster Manual), create or import a character, and play through adventures in a chat interface.
+DungeonAI is a **solo D&D experience** where you chat with an AI Dungeon Master. You upload your rulebooks (PHB, DMG, Monster Manual, etc.) and adventures, create or import a character, and play through adventures in a chat interface.
 
 The key difference from generic AI chatbots: **the AI cannot lie about mechanics**. Python handles all dice rolls, tracks your character state, and the AI only sees the results. When the AI needs to reference a rule, it searches your indexed rulebooks and cites the actual text.
 
